@@ -1,0 +1,710 @@
+unit OLX5;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, RegExpr, IdHTTP, Vcl.StdCtrls,
+  IdBaseComponent, IdAntiFreezeBase, Vcl.IdAntiFreeze, Vcl.OleCtrls, SHDocVw,
+  Vcl.ComCtrls, IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL,
+  Vcl.Grids;
+
+type
+  TForm1 = class(TForm)
+    Button1: TButton;
+    Edit1: TEdit;
+    IdAntiFreeze1: TIdAntiFreeze;
+    SaveDialog1: TSaveDialog;
+    ProgressBar1: TProgressBar;
+    Edit2: TEdit;
+    Label2: TLabel;
+    ComboBox1: TComboBox;
+    Edit3: TEdit;
+    Memo1: TMemo;
+    Memo2: TMemo;
+    Edit4: TEdit;
+    Edit5: TEdit;
+    Label1: TLabel;
+    Label3: TLabel;
+    data_list: TStringGrid;
+    Label4: TLabel;
+    Button2: TButton;
+    procedure FormCreate(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure ComboBox1Change(Sender: TObject);
+    procedure RamClean;
+    procedure Edit3Change(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+  function CntRecurrences(substr, str: string): integer;
+
+implementation
+
+{$R *.dfm}
+
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  i, pc: Integer;        //PageCount
+  IdHTTP: TIdHTTP;
+  IdSSL: TIdSSLIOHandlerSocketOpenSSL;
+  s, st, t, ph, nm, ct, Link, pLink, FName: string;    //Phone, Name, City, File Name
+  lst1, lst2, lst3, lst4: TStringList;
+  re1: TRegExpr;
+  flag: Boolean;
+begin
+  Edit3.Enabled := False;
+  Button1.Enabled := False;
+  Button2.Enabled := False;
+  case ComboBox1.ItemIndex of
+
+    0:    //OLX
+      begin
+        ProgressBar1.Position := 0;
+        Link := Edit3.Text;
+        //Link := StringReplace(WebBrowser1.LocationURL, 'm/', '', [rfReplaceAll, rfIgnoreCase]);
+        IdHTTP := TIdHTTP.Create;
+        IdHTTP.HandleRedirects := True;
+        IdHTTP.ProtocolVersion := pv1_1;
+        IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+        IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
+        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+        s := IdHTTP.Get(Link);
+        FreeAndNil(IdHTTP);    //убиваем IdHTTP
+        s := Copy(s, Pos('page_count', s), Pos('page_nb', s) - Pos('page_count', s));
+        s := Copy(s, Pos('":"', s) + Length('":"'), Pos('","', s) - Pos('":"', s) - Length('":"'));
+        pc := StrToInt(s);    //выявляем кол-во страниц
+        lst1 := TStringList.Create;    //создаем список для ссылок
+        re1 := TRegExpr.Create;        //создаем регулярку для захвата ссылок
+        re1.Expression := '<a href="https://www.olx.kz/obyavlenie/(.*?).html';
+
+        for i := 1 to pc do
+          begin
+            IdHTTP := TIdHTTP.Create;    //создаем IdHTTP
+            IdHTTP.HandleRedirects := True;
+            IdHTTP.ProtocolVersion := pv1_1;
+            IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+            IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+            IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+            IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
+            IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+            s := IdHTTP.Get(Link + '?page=' + IntToStr(i));
+            if re1.Exec(s) then
+            repeat
+              begin
+                lst1.Add(re1.Match[1]);
+                //Memo1.Lines.Add(re1.Match[1]);
+              end;
+            until not re1.ExecNext;
+            FreeAndNil(IdHTTP);    //убиваем IdHTTP
+            //ProgressBar1.Position := Round(i / pc) * 100;
+            Edit1.Text := IntToStr(lst1.Count);
+          end;
+
+        Edit1.Text := IntToStr(lst1.Count);
+        FreeAndNil(re1);    //убиваем регулярку
+
+        for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
+          begin
+            if lst1.IndexOf(lst1.Strings[i]) < i then
+              lst1.Delete(i)
+          end;
+        Edit1.Text := IntToStr(lst1.Count);
+
+//////////////////////Начало парсинга OLX////////////////////////
+
+        lst2 := TStringList.Create;
+        for i := 0 to lst1.Count - 1 do
+          begin
+            IdHTTP := TIdHTTP.Create;    //создаем IdHTTP
+            IdHTTP.ProtocolVersion := pv1_1;
+            IdHTTP.HandleRedirects := True;
+            IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+            IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+            IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+            IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
+            IdHTTP.Request.CustomHeaders.Add('Referer: https://www.olx.kz/obyavlenie/' + lst1.Strings[i] + '.html');
+            s := IdHTTP.Get('https://www.olx.kz/obyavlenie/' + lst1.Strings[i] + '.html');
+            re1 := TRegExpr.Create;    //создаем регулярку
+            re1.Expression := 'phoneToken = ''(.*?)'';';
+            re1.Exec(s);
+
+            try
+              ph := IdHTTP.Get('https://www.olx.kz/ajax/misc/contact/phone/' + copy(lst1.Strings[i], Pos('ID', lst1.Strings[i]) + 2, 5) + '/?pt=' + re1.Match[1]);
+              re1.Expression := '{"value":"(.*?)"}';
+              re1.Exec(ph);
+              ph := re1.Match[1];
+              ph := StringReplace(ph, '<span class=\"block\">', '', [rfReplaceAll, rfIgnoreCase]);
+              ph := StringReplace(ph, '<\/span>', ';', [rfReplaceAll, rfIgnoreCase]);
+              ph := StringReplace(ph, '+', '', [rfReplaceAll, rfIgnoreCase]);
+              ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+              ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+              ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+              ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+              if (Length(ph) = 11) and (Copy(ph, 1, 1) = '7') then
+                ph := '8' + copy(ph, 2, 10);
+              re1.Expression := '"block brkword xx-large">(.*?)</span>';
+              re1.Exec(s);
+              nm := re1.Match[1];
+              re1.Expression := 'show-map-link" href=""><strong>(.*?)</strong>';
+              re1.Exec(s);
+              ct := re1.Match[1];
+            except
+              Continue;
+            end;
+
+            lst2.Add(nm + ';' + ct + ';' + ph);
+            Edit2.Text := IntToStr(lst2.Count);
+            //Memo2.Lines.Add(nm + ';' + ct + ';' + ph);
+            FreeAndNil(IdHTTP);
+            FreeAndNil(re1);
+          end;
+        Edit2.Text := IntToStr(lst2.Count);
+        FreeAndNil(lst1);
+        SaveDialog1.FileName := FName;
+        if SaveDialog1.Execute then
+          begin
+            FName := SaveDialog1.FileName;
+            lst2.SaveToFile(FName);
+          end;
+        FreeAndNil(lst2);
+      end;
+
+    1:    //Колёса
+      begin
+        Link := Edit3.Text;
+        flag := True;
+        i := 1;
+        if Pos('?', Link) > 0 then
+          st := '&'
+        else
+          st := '?';
+        re1 := TRegExpr.Create;
+        re1.Expression := '<a href="/a/show/(.*?)" cla';
+        lst1 := TStringList.Create; //список ID объявлений
+        IdHTTP := TIdHTTP.Create;
+        IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+        IdHTTP.IOHandler := IdSSL;
+        IdHTTP.HandleRedirects := True;
+        IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36';
+        IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Encoding: gzip, deflate, br');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
+        IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
+        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+        Label4.Caption := 'Идёт сбор объявлений';
+        while flag = True do
+          begin
+            s := IdHTTP.Get(Link + st + 'page=' + IntToStr(i));
+            s := Copy(s, 1, Pos('Авто в Казахстане', s));
+            if re1.Exec(s) then    //собираем ID объявлений
+              repeat
+                lst1.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            i := i + 1;
+            Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
+            if (Pos('следую', s) = 0) or (Pos('gray right-arrow', s) > 0) then flag := False;
+          end;
+        for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
+          if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
+        Edit1.Text := IntToStr(lst1.Count); //показываем кол-во найденных уникальных объявлений
+        ProgressBar1.Position := 0;
+        ProgressBar1.Visible := True;
+
+        lst2 := TStringList.Create; //итоговый список всех данных для выгрузки
+        Label4.Caption := 'Идёт загрузка данных';
+        for i := lst1.Count - 1 downto 0 do
+          begin
+            try
+              begin
+                t := IdHTTP.Get('https://kolesa.kz/a/show/' + lst1.Strings[i]);
+                s := IdHTTP.Get('http://kolesa.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
+                re1.Expression := 'phone":"(.*?)"}';        //Телефон
+                re1.Exec(s);
+                ph := StringReplace(re1.Match[1], '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
+                re1.Expression := 'Город</dt>(.*?)dd>';     //Город
+                re1.Exec(t);
+                ct := Trim(re1.Match[1]);
+                re1.Expression := 'clearfix">(.*?)</';
+                re1.Exec(ct);
+                ct := Trim(re1.Match[1]);
+                lst2.Add(ct + ';' + ph);
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                //data_list.Cells[0, lst1.Count - i] := nm;
+                data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+              end;
+            except
+              begin
+                //data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
+              end;
+            end;
+          end;
+        Label4.Caption := 'Удаление дубликатов';
+        for i := lst2.Count - 1 downto 0 do       //удаление дубликатов из итогового списка
+          if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
+        Edit2.Text := IntToStr(lst2.Count); //показываем кол-во загруженных уникальных номеров
+        Label4.Caption := 'Сохранение';
+        SaveDialog1.FileName := FName;  //сохраняем в файл
+        if SaveDialog1.Execute then
+          begin
+            FName := SaveDialog1.FileName;
+            lst2.SaveToFile(FName);
+          end;
+        Label4.Caption := 'Завершено';
+      end;
+
+    2:    //Крыша
+      begin
+        Link := Edit3.Text;
+        flag := True;
+        i := 1;
+        if Pos('?', Link) > 0 then
+          st := '&'
+        else
+          st := '?';
+        re1 := TRegExpr.Create;
+        re1.Expression := 'link" href="/a/show/(.*?)" title';
+        lst1 := TStringList.Create; //список ID объявлений
+        IdHTTP := TIdHTTP.Create;
+        IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+        IdHTTP.IOHandler := IdSSL;
+        IdHTTP.HandleRedirects := True;
+        IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36';
+        IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Encoding: gzip, deflate, br');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
+        IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
+        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+		    Label4.Caption := 'Идёт сбор объявлений';
+        while flag = True do
+          begin
+            s := IdHTTP.Get(Link + st + 'page=' + IntToStr(i));
+            s := Copy(s, 1, Pos('Недвижимость в Казахстане', s));
+            if re1.Exec(s) then    //собираем ID объявлений
+              repeat
+                lst1.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            i := i + 1;
+            Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
+            if Pos('Дальше', s) = 0 then flag := False;
+          end;
+        for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
+          if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
+        Edit1.Text := IntToStr(lst1.Count); //показываем кол-во найденных уникальных объявлений
+        ProgressBar1.Position := 0;
+        ProgressBar1.Visible := True;
+
+        lst2 := TStringList.Create; //итоговый список всех данных для выгрузки
+        Label4.Caption := 'Идёт загрузка данных';
+        for i := lst1.Count - 1 downto 0 do
+          begin
+            try
+              begin
+                t := IdHTTP.Get('https://krisha.kz/a/show/' + lst1.Strings[i]);
+                s := IdHTTP.Get('http://krisha.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
+                re1.Expression := '\[(.*?)\]';        //Телефон
+                re1.Exec(s);
+                ph := StringReplace(re1.Match[1], '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
+                re1.Expression := 'a-where-region">(.*?)</div>';        //Город
+                re1.Exec(t);
+                ct := Trim(re1.Match[1]);
+                if Pos('link-underlined"', t) > 0 then    //Имя
+                  begin
+                    re1.Expression := 'link-underlined">(.*?)</a>';
+                    re1.Exec(t);
+                    nm := Trim(re1.Match[1]);
+                  end
+                else
+                  nm := 'Хозяин';
+                lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                data_list.Cells[0, lst1.Count - i] := nm;
+                data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+              end;
+            except
+              begin
+                data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
+              end;
+            end;
+          end;
+		    Label4.Caption := 'Удаление дубликатов';
+        for i := lst2.Count - 1 downto 0 do       //удаление дубликатов из итогового списка
+          if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
+        Edit2.Text := IntToStr(lst2.Count); //показываем кол-во загруженных уникальных номеров
+		    Label4.Caption := 'Сохранение';
+        SaveDialog1.FileName := FName;  //сохраняем в файл
+        if SaveDialog1.Execute then
+          begin
+            FName := SaveDialog1.FileName;
+            lst2.SaveToFile(FName);
+          end;
+		    Label4.Caption := 'Завершено';
+      end;
+
+    3:    //Маркет
+      begin
+        if Pos('?', Edit3.Text) = 0 then    //определяем ссылку
+          begin
+            Link := Edit3.Text;
+            pLink := '';
+          end
+        else
+          begin
+            Link := Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1);
+            pLink := '&' + Copy(Edit3.Text, Pos('?', Edit3.Text) + 1, Length(Edit3.Text) - Pos('?', Edit3.Text) + 1);
+          end;
+        flag := True;
+        i := 1;
+        re1 := TRegExpr.Create;
+        lst1 := TStringList.Create; //список расширенных ID объявлений с названиями в транслите
+        lst3 := TStringList.Create; //список ID объявлений
+        IdHTTP := TIdHTTP.Create;
+        IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+        IdHTTP.IOHandler := IdSSL;
+        IdHTTP.HandleRedirects := True;
+        IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36';
+        IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Encoding: gzip, deflate, br');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
+        IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
+        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+		    Label4.Caption := 'Идёт сбор объявлений';
+        while flag = True do
+          begin
+            s := IdHTTP.Get(Link + '?page=' + IntToStr(i) + pLink);
+            re1.Expression := 'data-id="(.*?)">';    //собираем ID объявлений
+            if re1.Exec(s) then
+              repeat
+                lst3.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            re1.Expression := '<a href="https://market.kz/a/(.*?)">';    //собираем расширенные ID объявлений
+            if re1.Exec(s) then
+              repeat
+                lst1.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            i := i + 1;
+            Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
+            if Pos('Вперед', s) = 0 then flag := False;
+          end;
+        for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
+          if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
+        for i := lst3.Count - 1 downto 0 do       //удаление дубликатов
+          if lst3.IndexOf(lst3.Strings[i]) < i then lst3.Delete(i);
+        Edit1.Text := IntToStr(lst1.Count); //показываем кол-во найденных уникальных объявлений
+        ProgressBar1.Position := 0;
+        ProgressBar1.Visible := True;
+
+        lst2 := TStringList.Create; //итоговый список всех данных для выгрузки
+        lst4 := TStringList.Create; //список параметров для получения номера телефона
+        Label4.Caption := 'Идёт загрузка данных';
+        for i := lst1.Count - 1 downto 0 do
+          begin
+            lst4.Add('id=' + lst3.Strings[i]);
+            re1.Expression := 'phones">(.*?)<';
+            try
+              begin
+                s := IdHTTP.Post('https://market.kz/ajax/load-phones/', lst4);
+                t := IdHTTP.Get('https://market.kz/a/' + lst1.Strings[i]);
+                ph := ''; //телефон
+                if re1.Exec(s) then
+                  repeat
+                    ph := ph + ';' + re1.Match[1];
+                  until not re1.ExecNext;
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
+                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                re1.Expression := '<dt>Регион</dt><dd>(.*?)</dd>';  //город
+                re1.Exec(t);
+                ct := Trim(re1.Match[1]);
+                re1.Expression := '<a href="/profile/(.*?)</a>';  //имя
+                re1.Exec(t);
+                nm := StringReplace(Trim(re1.Match[1]), '/">', ' ', [rfReplaceAll, rfIgnoreCase]);
+                lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                data_list.Cells[0, lst1.Count - i] := nm;
+                data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+                lst4.Clear;
+              end;
+            except
+              begin
+                data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
+              end;
+            end;
+          end;
+		    Label4.Caption := 'Удаление дубликатов';
+        for i := lst2.Count - 1 downto 0 do       //удаление дубликатов из итогового списка
+          if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
+        Edit2.Text := IntToStr(lst2.Count); //показываем кол-во загруженных уникальных номеров
+        FreeAndNil(lst3);
+        FreeAndNil(lst4);
+		    Label4.Caption := 'Сохранение';
+        SaveDialog1.FileName := FName;  //сохраняем в файл
+        if SaveDialog1.Execute then
+          begin
+            FName := SaveDialog1.FileName;
+            lst2.SaveToFile(FName);
+          end;
+		    Label4.Caption := 'Завершено';
+      end;
+
+    4:    //Satu
+      begin
+        if Pos('?', Edit3.Text) = 0 then    //определяем ссылку
+          begin
+            Link := Edit3.Text;
+            pLink := '';
+          end
+        else
+          begin
+            Link := Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1);
+            pLink := '?' + Copy(Edit3.Text, Pos('?', Edit3.Text) + 1, Length(Edit3.Text) - Pos('?', Edit3.Text) + 1);
+          end;
+        st := Copy(Edit3.Text, 1, Pos('satu.kz', Edit3.Text) - 1);
+        flag := True;
+        i := 1;
+        re1 := TRegExpr.Create;
+        re1.Expression := 'div><a href="(.*?)" data-qaid';
+        lst1 := TStringList.Create; //список ID объявлений
+        IdHTTP := TIdHTTP.Create;
+        IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+        IdHTTP.IOHandler := IdSSL;
+        IdHTTP.HandleRedirects := True;
+        IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.167 Safari/537.36';
+        IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Encoding: gzip, deflate, br');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
+        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+		    Label4.Caption := 'Идёт сбор объявлений';
+        while flag = True do
+          begin
+            s := IdHTTP.Get(Link + ';' + IntToStr(i) + pLink);
+            s := Copy(s, 1, Pos('ProductRecommendations', s));
+            if re1.Exec(s) then    //собираем ID объявлений
+              repeat
+                lst1.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            i := i + 1;
+            Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
+            if Pos('Вперед', s) = 0 then flag := False;
+          end;
+        for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
+          if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
+        Edit1.Text := IntToStr(lst1.Count); //показываем кол-во найденных уникальных объявлений
+        ProgressBar1.Position := 0;
+        ProgressBar1.Visible := True;
+
+        lst2 := TStringList.Create; //итоговый список всех данных для выгрузки
+        Label4.Caption := 'Идёт загрузка данных';
+        for i := lst1.Count - 1 downto 0 do
+          begin
+            try
+              begin
+                s := IdHTTP.Get(lst1.Strings[i]);
+                s := Copy(s, 1, Pos('Добавить в избранное', s));
+                s := Copy(s, Pos('data-pl-phones="', s), Pos('data-pl-main-phone=', s) - Pos('data-pl-phones="', s));
+                re1.Expression := '&#34;\+(.*?)&#34;,';        //Телефон
+                ph := ''; //телефон
+                if re1.Exec(s) then
+                  repeat
+                    ph := ph + ';' + re1.Match[1];
+                  until not re1.ExecNext;
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                {re1.Expression := 'a-where-region">(.*?)</div>';        //Город
+                re1.Exec(t);
+                ct := Trim(re1.Match[1]);
+                if Pos('link-underlined"', t) > 0 then    //Имя
+                  begin
+                    re1.Expression := 'link-underlined">(.*?)</a>';
+                    re1.Exec(t);
+                    nm := Trim(re1.Match[1]);
+                  end
+                else
+                  nm := 'Хозяин';}
+                lst2.Add(ph); //добавляем данные в итоговый список
+                //lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                //data_list.Cells[0, lst1.Count - i] := nm;
+                //data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+              end;
+            except
+              begin
+                //data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                //data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
+              end;
+            end;
+          end;
+		    Label4.Caption := 'Удаление дубликатов';
+        for i := lst2.Count - 1 downto 0 do       //удаление дубликатов из итогового списка
+          if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
+        Edit2.Text := IntToStr(lst2.Count); //показываем кол-во загруженных уникальных номеров
+		    Label4.Caption := 'Сохранение';
+        SaveDialog1.FileName := FName;  //сохраняем в файл
+        if SaveDialog1.Execute then
+          begin
+            FName := SaveDialog1.FileName;
+            lst2.SaveToFile(FName);
+          end;
+		    Label4.Caption := 'Завершено';
+      end;
+  end;
+  FreeAndNil(IdHTTP); //убиваем всё созданное
+  FreeAndNil(IdSSL);
+  FreeAndNil(lst1);
+  FreeAndNil(lst2);
+  FreeAndNil(re1);
+  Edit3.Enabled := True;
+  Button1.Enabled := True;
+  Button2.Enabled := True;
+  ProgressBar1.Position := 0;
+  ProgressBar1.Visible := False;
+  RamClean;
+end;
+
+procedure TForm1.ComboBox1Change(Sender: TObject);
+begin
+  case ComboBox1.ItemIndex of
+    0:
+      begin
+        //WebBrowser1.Navigate('https://www.olx.kz/m');
+      end;
+    1:
+      begin
+        //WebBrowser1.Navigate('https://m.kolesa.kz/');
+      end;
+    2:
+      begin
+        //WebBrowser1.Navigate('https://m.krisha.kz/');
+      end;
+    3:
+      begin
+        //WebBrowser1.Navigate('https://m.market.kz/');
+      end;
+  end;
+end;
+
+procedure TForm1.Edit3Change(Sender: TObject);
+begin
+  if (pos('https://kolesa.kz/', Edit3.Text) > 0)
+    or (pos('https://krisha.kz/', Edit3.Text) > 0)
+    or (pos('https://market.kz/', Edit3.Text) > 0)
+    or (pos('https://www.olx.kz/', Edit3.Text) > 0)
+    or (pos('satu.kz/', Edit3.Text) > 0) then
+    begin
+      Button1.Enabled := True;
+      Label4.Caption := '';
+      Edit3.Color := clMoneyGreen;
+    end
+  else if Edit3.Text = '' then
+    begin
+      Button1.Enabled := False;
+      Label4.Caption := '';
+      Edit3.Color := clWindow;
+    end
+  else
+    begin
+      Button1.Enabled := False;
+      Label4.Caption := 'Неверная ссылка';
+      Edit3.Color := clFuchsia;
+    end;
+end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  Form1.WindowState := wsMaximized;
+  //WebBrowser1.Navigate('https://www.olx.kz/m');
+  with data_list do
+    begin
+      Cells[0, 0] := 'Имя';
+      Cells[1, 0] := 'Город';
+      Cells[2, 0] := 'Телефон';
+    end;
+end;
+
+procedure TForm1.Button2Click(Sender: TObject);
+var
+  i: Integer;
+begin
+  Edit1.Text := '0';
+  Edit2.Text := '0';
+  Edit3.Clear;
+  with data_list do
+    for i := FixedRows to RowCount - 1 do
+      Rows[i].Clear;
+end;
+
+function CntRecurrences(substr, str: string): integer;
+var
+  cnt, p: integer;
+begin
+  cnt := 0;
+  while str <> '' do
+    begin
+      p := Pos(substr, str);
+      if p > 0 then
+        inc(cnt)
+      else
+        p := 1;
+      Delete(str, 1, (p + Length(substr) - 1));
+    end;
+  Result := cnt;
+end;
+
+procedure TForm1.RamClean;
+var
+  MainHandle: THandle;
+begin
+  if Win32Platform = VER_PLATFORM_WIN32_NT then
+    begin
+      MainHandle := OpenProcess(PROCESS_ALL_ACCESS, false, GetCurrentProcessID);
+      SetProcessWorkingSetSize(MainHandle, DWORD(-1), DWORD(-1));
+      CloseHandle(MainHandle);
+    end;
+end;
+
+end.
