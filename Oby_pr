@@ -74,10 +74,11 @@ begin
         lst1 := TStringList.Create; //список ID объявлений
         IdHTTP := TIdHTTP.Create;
         IdHTTP.HandleRedirects := True;
-        IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36';
+        IdHTTP.ProtocolVersion := pv1_1;
+        IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
         IdHTTP.Request.CustomHeaders.Add('Accept: */*');
-        IdHTTP.Request.CustomHeaders.Add('Accept-Encoding: gzip, deflate, br');
-        IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+        IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         Label4.Caption := 'Идёт сбор объявлений';
         while flag = True do
@@ -97,6 +98,7 @@ begin
         Edit1.Text := IntToStr(lst1.Count); //показываем кол-во найденных уникальных объявлений
         ProgressBar1.Position := 0;
         ProgressBar1.Visible := True;
+        FreeAndNil(IdHTTP);
 
         lst2 := TStringList.Create; //итоговый список всех данных для выгрузки
         Label4.Caption := 'Идёт загрузка данных';
@@ -104,11 +106,13 @@ begin
           begin
             try
               begin
-                IdHTTP.Request.CustomHeaders.Clear;
-                IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36';
+                IdHTTP := TIdHTTP.Create;    //создаем IdHTTP
+                IdHTTP.ProtocolVersion := pv1_1;
+                IdHTTP.HandleRedirects := True;
+                IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
                 IdHTTP.Request.CustomHeaders.Add('Accept: */*');
-                IdHTTP.Request.CustomHeaders.Add('Accept-Encoding: gzip, deflate, br');
-                IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
+                IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+                IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
                 IdHTTP.Request.CustomHeaders.Add('Referer: https://www.olx.kz/obyavlenie/' + lst1.Strings[i] + '.html');
                 s := IdHTTP.Get('https://www.olx.kz/obyavlenie/' + lst1.Strings[i] + '.html');
                 re1.Expression := 'phoneToken = ''(.*?)'';';
@@ -137,6 +141,7 @@ begin
                 data_list.Cells[0, lst1.Count - i] := nm;
                 data_list.Cells[1, lst1.Count - i] := ct;
                 data_list.Cells[2, lst1.Count - i] := ph;
+                FreeAndNil(IdHTTP);
               end;
             except
               begin
