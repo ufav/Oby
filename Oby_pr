@@ -276,7 +276,7 @@ begin
         IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
-            Label4.Caption := 'Идёт сбор объявлений';
+        Label4.Caption := 'Идёт сбор объявлений';
         while flag = True do
           begin
             s := IdHTTP.Get(Link + st + 'page=' + IntToStr(i));
@@ -339,18 +339,18 @@ begin
               end;
             end;
           end;
-            Label4.Caption := 'Удаление дубликатов';
+        Label4.Caption := 'Удаление дубликатов';
         for i := lst2.Count - 1 downto 0 do       //удаление дубликатов из итогового списка
           if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
         Edit2.Text := IntToStr(lst2.Count); //показываем кол-во загруженных уникальных номеров
-            Label4.Caption := 'Сохранение';
+        Label4.Caption := 'Сохранение';
         SaveDialog1.FileName := FName;  //сохраняем в файл
         if SaveDialog1.Execute then
           begin
             FName := SaveDialog1.FileName;
             lst2.SaveToFile(FName);
           end;
-            Label4.Caption := 'Завершено';
+        Label4.Caption := 'Завершено';
       end;
 
     3:    //Маркет
@@ -380,7 +380,7 @@ begin
         IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
-            Label4.Caption := 'Идёт сбор объявлений';
+        Label4.Caption := 'Идёт сбор объявлений';
         while flag = True do
           begin
             s := IdHTTP.Get(Link + '?page=' + IntToStr(i) + pLink);
@@ -452,20 +452,20 @@ begin
               end;
             end;
           end;
-            Label4.Caption := 'Удаление дубликатов';
+        Label4.Caption := 'Удаление дубликатов';
         for i := lst2.Count - 1 downto 0 do       //удаление дубликатов из итогового списка
           if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
         Edit2.Text := IntToStr(lst2.Count); //показываем кол-во загруженных уникальных номеров
         FreeAndNil(lst3);
         FreeAndNil(lst4);
-            Label4.Caption := 'Сохранение';
+        Label4.Caption := 'Сохранение';
         SaveDialog1.FileName := FName;  //сохраняем в файл
         if SaveDialog1.Execute then
           begin
             FName := SaveDialog1.FileName;
             lst2.SaveToFile(FName);
           end;
-            Label4.Caption := 'Завершено';
+        Label4.Caption := 'Завершено';
       end;
 
     4:    //Satu
@@ -495,7 +495,7 @@ begin
         IdHTTP.Request.CustomHeaders.Add('Accept-Encoding: gzip, deflate, br');
         IdHTTP.Request.CustomHeaders.Add('Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
-            Label4.Caption := 'Идёт сбор объявлений';
+        Label4.Caption := 'Идёт сбор объявлений';
         while flag = True do
           begin
             s := IdHTTP.Get(Link + ';' + IntToStr(i) + pLink);
@@ -562,18 +562,18 @@ begin
               end;
             end;
           end;
-            Label4.Caption := 'Удаление дубликатов';
+        Label4.Caption := 'Удаление дубликатов';
         for i := lst2.Count - 1 downto 0 do       //удаление дубликатов из итогового списка
           if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
         Edit2.Text := IntToStr(lst2.Count); //показываем кол-во загруженных уникальных номеров
-            Label4.Caption := 'Сохранение';
+        Label4.Caption := 'Сохранение';
         SaveDialog1.FileName := FName;  //сохраняем в файл
         if SaveDialog1.Execute then
           begin
             FName := SaveDialog1.FileName;
             lst2.SaveToFile(FName);
           end;
-            Label4.Caption := 'Завершено';
+        Label4.Caption := 'Завершено';
       end;
   end;
   FreeAndNil(IdHTTP); //убиваем всё созданное
