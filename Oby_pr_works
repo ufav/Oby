@@ -3,7 +3,11 @@ unit OLX5;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, RegExpr, IdHTTP, Vcl.StdCtrls, IdBaseComponent, IdAntiFreezeBase, Vcl.IdAntiFreeze, Vcl.OleCtrls, SHDocVw, Vcl.ComCtrls, IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL, Vcl.Grids;
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, RegExpr, IdHTTP, Vcl.StdCtrls,
+  IdBaseComponent, IdAntiFreezeBase, Vcl.IdAntiFreeze, Vcl.OleCtrls, SHDocVw,
+  Vcl.ComCtrls, IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL,
+  Vcl.Grids, IdURI;
 
 type
   TForm1 = class(TForm)
@@ -530,6 +534,84 @@ begin
               end;
           end;
       end;
+    5:    //2gis
+      begin
+        Link := TIdURI.URLEncode(Edit3.Text);
+        st := '/page/';
+        re1.Expression := '/firm/(.*?)" cla';
+        IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
+        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+        while flag do
+          begin
+            s := IdHTTP.Get(Link + st + IntToStr(i));
+            if re1.Exec(s) then    //собираем ID
+              repeat
+                lst1.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            i := i + 1;
+            Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных
+            if Pos('pagination__arrow _right _disabled', s) > 0 then flag := False;
+          end;
+        for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
+          if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
+        Edit1.Text := IntToStr(lst1.Count); //показываем кол-во найденных уникальных
+        ProgressBar1.Position := 0;
+        ProgressBar1.Visible := True;
+
+        stop_btn.Visible := True;
+        Label4.Caption := 'Идёт загрузка данных';
+        for i := lst1.Count - 1 downto 0 do
+          begin
+            if stop_flag then
+              Break
+            else
+              begin
+                try
+                  begin
+                    s := IdHTTP.Get('https://2gis.kz/almaty/firm/' + lst1.Strings[i]);
+                    if Pos('tel:', s) = 0 then
+                      Continue;
+                    re1.Expression := '"tel:(.*?)" cla';        //Телефон
+                    ph := '';
+                    if re1.Exec(s) then
+                      repeat
+                        ph := ph + ';' + re1.Match[1];
+                      until not re1.ExecNext;
+                    ph := StringReplace(ph, '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
+                    ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                    ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                    ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                    ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                    ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
+                    ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
+                    if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                    re1.Expression := 'card__addressLink _undashed">(.*?)</a';        //Город
+                    re1.Exec(s);
+                    ct := StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                    ct := StringReplace(ct, ',', '', [rfReplaceAll, rfIgnoreCase]);
+                    ct := Trim(StringReplace(ct, '<br/>', ' ', [rfReplaceAll, rfIgnoreCase]));
+                    re1.Expression := 'cardHeader__headerNameText">(.*?)</h';
+                    re1.Exec(s);
+                    nm := Trim(StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]));
+                    nm := Trim(StringReplace(nm, ',', '', [rfReplaceAll, rfIgnoreCase]));
+                    lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                    Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                    ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                    data_list.Cells[0, lst1.Count - i] := nm;
+                    data_list.Cells[1, lst1.Count - i] := ct;
+                    data_list.Cells[2, lst1.Count - i] := ph;
+                  end;
+                except
+                  begin
+                    data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                    data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                    data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                    Continue;
+                  end;
+                end;
+              end;
+          end;
+      end;
   end;
   FreeAndNil(IdHTTP); //убиваем всё созданное
   FreeAndNil(IdSSL);
@@ -566,12 +648,13 @@ begin
   IdHTTP.Request.CustomHeaders.Add('Referer: ' + Edit3.Text);
   if Length(Edit3.Text) > 0 then
     try
-      s := IdHTTP.Get(Edit3.Text);
+      s := IdHTTP.Get(TIdURI.URLEncode(Edit3.Text));
       if (pos('https://www.olx.kz/', Edit3.Text) > 0)
         or (pos('https://kolesa.kz/', Edit3.Text) > 0)
         or (pos('https://krisha.kz/', Edit3.Text) > 0)
         or (pos('https://market.kz/', Edit3.Text) > 0)
-        or (pos('satu.kz/', Edit3.Text) > 0) then
+        or (pos('satu.kz/', Edit3.Text) > 0)
+        or (pos('https://2gis.kz/', Edit3.Text) > 0) then
         begin
           start_btn.Enabled := True;
           Label4.Caption := '';
@@ -583,7 +666,9 @@ begin
           else if pos('https://krisha.kz/', Edit3.Text) > 0 then
             site := 2
           else if pos('https://market.kz/', Edit3.Text) > 0 then
-            site := 3;
+            site := 3
+          else if pos('https://2gis.kz/', Edit3.Text) > 0 then
+            site := 5;
         end
     except
       begin
@@ -652,7 +737,7 @@ end;
 procedure TForm1.SaveToFile;
 begin
   Label4.Caption := 'Сохранение';
-  if SaveDialog1.Execute then   
+  if SaveDialog1.Execute then
     begin
       if FileExists(SaveDialog1.FileName) then
         begin
