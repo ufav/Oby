@@ -1,0 +1,91 @@
+unit FormTesseractOCRImage;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  System.UITypes, System.Types, System.IOUtils, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  Vcl.ComCtrls, Vcl.Samples.Spin,
+  tesseractocr;
+
+type
+  TForm1 = class(TForm)
+    OpenDialogImage: TOpenDialog;
+    //PaintBox1: TPaintBox;
+    Memo1: TMemo;
+    btnRecognize: TButton;
+    btnOpenFile: TButton;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure btnOpenFileClick(Sender: TObject);
+
+  private
+    { Private declarations }
+    //FSelectingROI: Boolean;
+    //FSelectionROI: TRect;
+    //FImageROI: TRect;
+    FSourceImage: TBitmap;
+    //FSourceImageFileName: String;
+    procedure OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+uses
+  tesseractocr.pagelayout,
+  tesseractocr.utils,
+  tesseractocr.capi;
+
+{$R *.dfm}
+
+{ TForm1 }
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  Tesseract.Free;
+  if Assigned(FSourceImage) then
+    FSourceImage.Free;
+end;
+
+procedure TForm1.btnOpenFileClick(Sender: TObject);
+var
+  Stream: TMemoryStream;
+  png: TPNGImage;
+  Result: string;
+
+begin
+  Tesseract := TTesseractOCR4.Create;
+  Stream := TMemoryStream.Create;
+  Tesseract.OnRecognizeEnd := OnRecognizeEnd;
+  try
+    IdHTTP1.Get('https://lalafo.kg/ajax/mobile/42711246', Stream);
+    Stream.Position := 0;
+    Result := IdHTTP1.Response.ContentType;
+    if Result = 'text/html' then
+      begin
+        png := TPNGImage.Create;
+        png.LoadFromStream(Stream);
+      end
+  finally
+    Stream.Free;
+    if Result = 'text/html' then
+      if Tesseract.SetImage(png) then
+        begin
+          //FSourceImageFileName := png;
+          FSourceImage := Tesseract.GetSourceImagePNG;
+          Tesseract.SetRectangle(Rect(0, 0, FSourceImage.Width, FSourceImage.Height));
+          Tesseract.PageSegMode := TessPageSegMode(14);
+          Tesseract.Recognize;
+        end;
+end;
+
+procedure TForm1.OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
+begin
+  Memo1.Text := Tesseract.UTF8Text;
+end;
+
+end.
