@@ -3,36 +3,30 @@ unit FormTesseractOCRImage;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  System.UITypes, System.Types, System.IOUtils, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  Vcl.ComCtrls, Vcl.Samples.Spin,
-  tesseractocr;
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, System.UITypes, System.Types, System.IOUtils, Vcl.Controls, Vcl.Forms,
+  Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.ComCtrls, Vcl.Samples.Spin, TesseractOCR,
+  PNGImage, IdHTTP, IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL;
 
 type
-  TForm1 = class(TForm)
+  TTesseractOCRImageForm = class(TForm)
     OpenDialogImage: TOpenDialog;
-    //PaintBox1: TPaintBox;
-    Memo1: TMemo;
-    btnRecognize: TButton;
+    memText: TMemo;
     btnOpenFile: TButton;
-    procedure FormCreate(Sender: TObject);
-    procedure FormDestroy(Sender: TObject);
+    Image1: TImage;
     procedure btnOpenFileClick(Sender: TObject);
 
   private
     { Private declarations }
-    //FSelectingROI: Boolean;
-    //FSelectionROI: TRect;
-    //FImageROI: TRect;
     FSourceImage: TBitmap;
-    //FSourceImageFileName: String;
+    FSourceImageFileName: String;
     procedure OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
   public
     { Public declarations }
   end;
 
 var
-  Form1: TForm1;
+  TesseractOCRImageForm: TTesseractOCRImageForm;
 
 implementation
 uses
@@ -42,50 +36,99 @@ uses
 
 {$R *.dfm}
 
-{ TForm1 }
+{ TTesseractOCRImageForm }
 
-procedure TForm1.FormDestroy(Sender: TObject);
-begin
-  Tesseract.Free;
-  if Assigned(FSourceImage) then
-    FSourceImage.Free;
-end;
-
-procedure TForm1.btnOpenFileClick(Sender: TObject);
+procedure TTesseractOCRImageForm.btnOpenFileClick(Sender: TObject);
 var
+  IdHTTP: TIdHTTP;
+  IdSSL: TIdSSLIOHandlerSocketOpenSSL;
   Stream: TMemoryStream;
-  png: TPNGImage;
+  PNG: TPNGImage;
   Result: string;
+  PNGBitMap: TBitmap;
+  x, y: Integer;
 
 begin
-  Tesseract := TTesseractOCR4.Create;
+  IdHTTP := TIdHTTP.Create;
+  IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+  IdHTTP.IOHandler := IdSSL;
+  IdHTTP.HandleRedirects := True;
+  IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+  IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+  IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+  IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
   Stream := TMemoryStream.Create;
-  Tesseract.OnRecognizeEnd := OnRecognizeEnd;
   try
-    IdHTTP1.Get('https://lalafo.kg/ajax/mobile/42711246', Stream);
+    try
+      IdHTTP.Get('https://lalafo.kg/ajax/mobile/36535498', Stream);
+    except
+    end;
     Stream.Position := 0;
-    Result := IdHTTP1.Response.ContentType;
-    if Result = 'text/html' then
+    Result := IdHTTP.Response.ContentType;
       begin
-        png := TPNGImage.Create;
-        png.LoadFromStream(Stream);
-      end
+        if Result = 'text/html' then
+          begin
+            PNG := TPNGImage.Create;
+            PNG.LoadFromStream(Stream);
+          end
+        else
+          ShowMessage('Error');
+      end;
   finally
     Stream.Free;
+    Tesseract := TTesseractOCR4.Create;
+    Tesseract.OnRecognizeEnd := OnRecognizeEnd;
+    Tesseract.Initialize('tessdata\', 'eng', oemDefault);
     if Result = 'text/html' then
-      if Tesseract.SetImage(png) then
+      Image1.Picture.Bitmap.Assign(PNG);
+
+    {begin
+      for x := 1 to Image1.Width do
         begin
-          //FSourceImageFileName := png;
-          FSourceImage := Tesseract.GetSourceImagePNG;
-          Tesseract.SetRectangle(Rect(0, 0, FSourceImage.Width, FSourceImage.Height));
+          for y := 1 to Image1.Height do
+            begin
+              //memText.Lines.Add(ColorToString(Image1.Canvas.Pixels[x, y]) + IntToStr(x) + ' - ' + IntToStr(y));
+              if (Image1.Canvas.Pixels[x, y] = clBlack)
+              or (Image1.Canvas.Pixels[x, y] = $FFFFFFFF)  then
+                Image1.Canvas.Pixels[x, y] := clWhite;
+            end;
+        end;
+    end;}
+
+
+
+//SetStretchBltMode(Image1.canvas.handle,STRETCH_HALFTONE);
+Image1.Picture.Bitmap.Height:= Image1.Picture.Bitmap.Height * 2;
+//Image1.Picture.Bitmap.Width:= Image1.Picture.Bitmap.Width * 2;
+//StretchBlt(Image1.Picture.Bitmap.Canvas.Handle,0,0,Image1.Width,Image1.Height, Image1.Picture.Bitmap.Canvas.Handle,0,0,185,20,srccopy);
+
+      Image1.Picture.SaveToFile('C:\Users\Admin\Desktop\1.png');
+      if Tesseract.SetImage('C:\Users\Admin\Desktop\1.png') then
+        begin
+          FSourceImageFileName := OpenDialogImage.FileName;
+          FSourceImage := Tesseract.GetSourceImageBMP;
           Tesseract.PageSegMode := TessPageSegMode(14);
           Tesseract.Recognize;
         end;
+  end;
+
+
+  {Tesseract := TTesseractOCR4.Create;
+  Tesseract.OnRecognizeEnd := OnRecognizeEnd;
+  Tesseract.Initialize('tessdata\', 'eng', oemDefault);
+  if OpenDialogImage.Execute then
+    if Tesseract.SetImage(OpenDialogImage.FileName) then
+      begin
+        FSourceImageFileName := OpenDialogImage.FileName;
+        FSourceImage := Tesseract.GetSourceImageBMP;
+        Tesseract.Recognize;
+      end;}
+
 end;
 
-procedure TForm1.OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
+procedure TTesseractOCRImageForm.OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
 begin
-  Memo1.Text := Tesseract.UTF8Text;
+  memText.Text := Tesseract.UTF8Text;
 end;
 
 end.
