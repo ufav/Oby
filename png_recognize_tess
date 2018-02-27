@@ -1,0 +1,104 @@
+unit FormTesseractOCRImage;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  System.UITypes, System.Types, System.IOUtils, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  Vcl.ComCtrls, Vcl.Samples.Spin,
+  tesseractocr;
+
+type
+  TTesseractOCRImageForm = class(TForm)
+    OpenDialogImage: TOpenDialog;
+    pbImage: TPaintBox;
+    memText: TMemo;
+    btnRecognize: TButton;
+    btnOpenFile: TButton;
+    procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure btnOpenFileClick(Sender: TObject);
+    procedure btnRecognizeClick(Sender: TObject);
+
+  private
+    { Private declarations }
+    FSelectingROI: Boolean;
+    FSelectionROI: TRect;
+    FImageROI: TRect;
+    FSourceImage: TBitmap;
+    FSourceImageFileName: String;
+    procedure OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
+  public
+    { Public declarations }
+  end;
+
+var
+  TesseractOCRImageForm: TTesseractOCRImageForm;
+
+implementation
+uses
+  tesseractocr.pagelayout,
+  tesseractocr.utils,
+  tesseractocr.capi;
+
+{$R *.dfm}
+
+{ TTesseractOCRImageForm }
+
+procedure TTesseractOCRImageForm.FormCreate(Sender: TObject);
+begin
+  FSelectingROI := False;
+  Tesseract := TTesseractOCR4.Create;
+  Tesseract.OnRecognizeEnd := OnRecognizeEnd;
+  if not Tesseract.Initialize('tessdata\', 'eng', oemDefault) then
+  begin
+    MessageDlg('Error loading Tesseract data', mtError, [mbOk], 0);
+    Application.ShowMainForm := False;
+    Application.Terminate;
+  end;
+end;
+
+procedure TTesseractOCRImageForm.FormDestroy(Sender: TObject);
+begin
+  Tesseract.Free;
+  if Assigned(FSourceImage) then
+    FSourceImage.Free;
+end;
+
+procedure TTesseractOCRImageForm.btnOpenFileClick(Sender: TObject);
+begin
+  if Tesseract.Busy then Exit;
+  if OpenDialogImage.Execute then
+  begin
+    if Assigned(FSourceImage) then
+      FreeAndNil(FSourceImage);
+    if Tesseract.SetImage(OpenDialogImage.FileName) then
+    begin
+      FSourceImageFileName := OpenDialogImage.FileName;
+      FSourceImage := Tesseract.GetSourceImageBMP;
+      FSelectionROI := Rect(0, 0, 0, 0);
+      pbImage.Invalidate;
+    end;
+  end;
+end;
+
+procedure TTesseractOCRImageForm.btnRecognizeClick(Sender: TObject);
+begin
+  if not Assigned(FSourceImage) then Exit;
+  if (FImageROI.Width > 0) and
+     (FImageROI.Height > 0) then
+  begin
+    Tesseract.SetRectangle(FImageROI);
+  end else
+    Tesseract.SetRectangle(Rect(0, 0, FSourceImage.Width, FSourceImage.Height));
+  Tesseract.PageSegMode := TessPageSegMode(14);
+  Tesseract.Recognize;
+
+end;
+
+procedure TTesseractOCRImageForm.OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
+begin
+  memText.Text := Tesseract.UTF8Text;
+end;
+
+end.
