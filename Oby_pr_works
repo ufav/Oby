@@ -83,7 +83,7 @@ begin
   IdHTTP.Request.CustomHeaders.Add('Accept: */*');
   IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
   IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
-  Label4.Caption := 'Идёт сбор объявлений';
+  Label4.Caption := 'Сбор данных';
   case site of
     0:    //OLX
       begin
@@ -110,7 +110,7 @@ begin
         FreeAndNil(IdSSL);
 
         stop_btn.Visible := True;
-        Label4.Caption := 'Идёт загрузка данных';
+        Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
             if stop_flag then
@@ -217,7 +217,7 @@ begin
         ProgressBar1.Visible := True;
 
         stop_btn.Visible := True;
-        Label4.Caption := 'Идёт загрузка данных';
+        Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
             if stop_flag then
@@ -299,7 +299,7 @@ begin
         ProgressBar1.Visible := True;
 
         stop_btn.Visible := True;
-        Label4.Caption := 'Идёт загрузка данных';
+        Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
             if stop_flag then
@@ -394,7 +394,7 @@ begin
 
         lst4 := TStringList.Create; //список параметров для получения номера телефона
         stop_btn.Visible := True;
-        Label4.Caption := 'Идёт загрузка данных';
+        Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
             if stop_flag then
@@ -481,7 +481,7 @@ begin
         ProgressBar1.Visible := True;
 
         stop_btn.Visible := True;
-        Label4.Caption := 'Идёт загрузка данных';
+        Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
             if stop_flag then
@@ -536,9 +536,11 @@ begin
       end;
     5:    //2gis
       begin
-        Link := TIdURI.URLEncode(Edit3.Text);
+        if Pos('?', Edit3.Text) > 0 then Link := TIdURI.URLEncode(Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1))
+        else Link := TIdURI.URLEncode(Edit3.Text);
+        pLink := Copy(Link, 1, Pos('search', Link) - 1);
         st := '/page/';
-        re1.Expression := '/firm/(.*?)" cla';
+        re1.Expression := '/firm/(.*?)"';
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
@@ -559,7 +561,7 @@ begin
         ProgressBar1.Visible := True;
 
         stop_btn.Visible := True;
-        Label4.Caption := 'Идёт загрузка данных';
+        Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
             if stop_flag then
@@ -568,44 +570,44 @@ begin
               begin
                 try
                   begin
-                    s := IdHTTP.Get('https://2gis.kz/almaty/firm/' + lst1.Strings[i]);
+                    s := IdHTTP.Get(pLink + 'firm/' + lst1.Strings[i]);
+                    t := s;
+                    if Pos('Контакты', t) > 0 then t := Copy(t, Pos('Контакты', t), length(t) - Pos('Контакты', t));
                     if Pos('tel:', s) = 0 then
                       Continue;
                     re1.Expression := '"tel:(.*?)" cla';        //Телефон
-                    ph := '';
-                    if re1.Exec(s) then
+                    if re1.Exec(t) then
                       repeat
                         ph := ph + ';' + re1.Match[1];
                       until not re1.ExecNext;
-                    ph := StringReplace(ph, '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
                     if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
-                    re1.Expression := 'card__addressLink _undashed">(.*?)</a';        //Город
+                    if pos('cardAddressName', s) > 0 then re1.Expression := 'cardAddressName">(.*?)</di'  //Город
+                    else if pos('addressLink _undashed', s) > 0 then re1.Expression := 'addressLink _undashed">(.*?)</a'
+                    else re1.Expression := 'geo/\d{17}">(.*?)</a';
                     re1.Exec(s);
                     ct := StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]);
                     ct := StringReplace(ct, ',', '', [rfReplaceAll, rfIgnoreCase]);
                     ct := Trim(StringReplace(ct, '<br/>', ' ', [rfReplaceAll, rfIgnoreCase]));
-                    re1.Expression := 'cardHeader__headerNameText">(.*?)</h';
+                    if pos('cardHeaderName', s) > 0 then re1.Expression := 'cardHeaderName">(.*?)</h'      //Имя
+                    else re1.Expression := 'headerNameText">(.*?)</h';
                     re1.Exec(s);
-                    nm := Trim(StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]));
+                    nm := StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                    nm := StringReplace(re1.Match[1], '&&#x60;', ' ', [rfReplaceAll, rfIgnoreCase]);
                     nm := Trim(StringReplace(nm, ',', '', [rfReplaceAll, rfIgnoreCase]));
                     lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
                     Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
                     ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
-                    data_list.Cells[0, lst1.Count - i] := nm;
-                    data_list.Cells[1, lst1.Count - i] := ct;
-                    data_list.Cells[2, lst1.Count - i] := ph;
+                    data_list.Cells[0, lst2.Count] := nm;
+                    data_list.Cells[1, lst2.Count] := ct;
+                    data_list.Cells[2, lst2.Count] := ph;
+                    ph := '';
                   end;
                 except
-                  begin
-                    data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
-                    data_list.Cells[1, lst1.Count - i] := 'Ошибка';
-                    data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                  begin         //иначе ошибка
+                    lst2.Add(';'); //добавляем ошибочные данные в итоговый список
+                    data_list.Cells[0, lst2.Count] := 'Ошибка';
+                    data_list.Cells[1, lst2.Count] := 'Ошибка';
+                    data_list.Cells[2, lst2.Count] := 'Ошибка';
                     Continue;
                   end;
                 end;
@@ -636,6 +638,7 @@ var
   IdSSL: TIdSSLIOHandlerSocketOpenSSL;
   s: string;
 begin
+  Label4.Caption := 'Проверка ссылки';
   IdHTTP := TIdHTTP.Create;
   IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
   IdHTTP.IOHandler := IdSSL;
@@ -657,7 +660,7 @@ begin
         or (pos('https://2gis.kz/', Edit3.Text) > 0) then
         begin
           start_btn.Enabled := True;
-          Label4.Caption := '';
+          Label4.Caption := 'Ссылка исправна';
           Edit3.Color := clMoneyGreen;
           if pos('https://www.olx.kz/', Edit3.Text) > 0 then
             site := 0
@@ -705,6 +708,7 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   //Form1.WindowState := wsMaximized;
+  start_btn.Enabled := False;
   //WebBrowser1.Navigate('https://www.olx.kz/m');
   with data_list do
   begin
