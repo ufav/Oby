@@ -7,7 +7,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, RegExpr, IdHTTP, Vcl.StdCtrls,
   IdBaseComponent, IdAntiFreezeBase, Vcl.IdAntiFreeze, Vcl.OleCtrls, SHDocVw,
   Vcl.ComCtrls, IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL,
-  Vcl.Grids, IdURI;
+  Vcl.Grids, IdURI, System.UITypes;
 
 type
   TForm1 = class(TForm)
@@ -29,6 +29,8 @@ type
     Label4: TLabel;
     clear_btn: TButton;
     stop_btn: TButton;
+    only_phone_2gis: TRadioButton;
+    all_2gis: TRadioButton;
     procedure FormCreate(Sender: TObject);
     procedure start_btnClick(Sender: TObject);
     procedure RamClean;
@@ -91,7 +93,7 @@ begin
         re1.Expression := '<a href="https://www.olx.kz/obyavlenie/(.*?).html';
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
-          begin
+          try
             s := IdHTTP.Get(Link + '?page=' + IntToStr(i));
             if re1.Exec(s) then    //собираем ID объявлений
               repeat
@@ -100,6 +102,8 @@ begin
             i := i + 1;
             Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
             if Pos('	<span>Следующее', s) = 0 then flag := False; //#$9
+          except
+            Continue;
           end;
         for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
           if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
@@ -113,77 +117,66 @@ begin
         Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
-            if stop_flag then
-              Break
+            if stop_flag then Break
             else
-              begin
+              try
+                IdHTTP := TIdHTTP.Create;    //создаем IdHTTP
+                IdHTTP.ProtocolVersion := pv1_1;
+                IdHTTP.HandleRedirects := True;
+                IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+                IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+                IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+                IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
+                IdHTTP.Request.CustomHeaders.Add('Referer: https://www.olx.kz/obyavlenie/' + lst1.Strings[i] + '.html');
+                s := IdHTTP.Get('https://www.olx.kz/obyavlenie/' + lst1.Strings[i] + '.html');
                 try
-                  begin
-                    IdHTTP := TIdHTTP.Create;    //создаем IdHTTP
-                    IdHTTP.ProtocolVersion := pv1_1;
-                    IdHTTP.HandleRedirects := True;
-                    IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
-                    IdHTTP.Request.CustomHeaders.Add('Accept: */*');
-                    IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
-                    IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
-                    IdHTTP.Request.CustomHeaders.Add('Referer: https://www.olx.kz/obyavlenie/' + lst1.Strings[i] + '.html');
-                    s := IdHTTP.Get('https://www.olx.kz/obyavlenie/' + lst1.Strings[i] + '.html');
-                    try
-                      begin
-                        re1.Expression := 'phoneToken = ''(.*?)'';';
-                        re1.Exec(s);
-                        t := IdHTTP.Get('https://www.olx.kz/ajax/misc/contact/phone/' + copy(lst1.Strings[i], Pos('ID', lst1.Strings[i]) + 2, 5) + '/?pt=' + re1.Match[1]);    //Телефон
-                        re1.Expression := '{"value":"(.*?)"}';
-                        ph := ''; //телефон
-                        if re1.Exec(t) then
-                          repeat
-                            ph := ph + ';' + re1.Match[1];
-                          until not re1.ExecNext;
-                      end;
-                    except
-                      begin
-                        if pos('data-phone=', s) > 0 then
-                          begin
-                            re1.Expression := 'data-phone="(.*?)">';
-                            ph := ''; //телефон
-                            if re1.Exec(s) then
-                              repeat
-                                if (Pos('.', re1.Match[1]) = 0) and (Length(re1.Match[1]) > 9) then ph := ph + ';' + re1.Match[1];
-                              until not re1.ExecNext;
-                          end;
-                      end;
-                    end;
-                    ph := StringReplace(ph, '<span class=\"block\">', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '<\/span>', ';', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '+', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                    if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
-                    if (Length(ph) = 11) and (Copy(ph, 1, 1) = '7') then ph := '8' + copy(ph, 2, 10);
-                    re1.Expression := '"block brkword xx-large">(.*?)</span>';    //имя
-                    re1.Exec(s);
-                    nm := re1.Match[1];
-                    re1.Expression := 'show-map-link" href=""><strong>(.*?)</strong>';    //город
-                    re1.Exec(s);
-                    ct := re1.Match[1];
-                    lst2.Add(nm + ';' + ct + ';' + ph);
-                    Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
-                    ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
-                    data_list.Cells[0, lst1.Count - i] := nm;
-                    data_list.Cells[1, lst1.Count - i] := ct;
-                    data_list.Cells[2, lst1.Count - i] := ph;
-                    FreeAndNil(IdHTTP);
-                  end;
+                  re1.Expression := 'phoneToken = ''(.*?)'';';
+                  re1.Exec(s);
+                  t := IdHTTP.Get('https://www.olx.kz/ajax/misc/contact/phone/' + copy(lst1.Strings[i], Pos('ID', lst1.Strings[i]) + 2, 5) + '/?pt=' + re1.Match[1]);    //Телефон
+                  re1.Expression := '{"value":"(.*?)"}';
+                  ph := ''; //телефон
+                  if re1.Exec(t) then
+                    repeat
+                      ph := ph + ';' + re1.Match[1];
+                    until not re1.ExecNext;
                 except
-                  begin
-                    data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
-                    data_list.Cells[1, lst1.Count - i] := 'Ошибка';
-                    data_list.Cells[2, lst1.Count - i] := 'Ошибка';
-                    Continue;
-                  end;
+                  if pos('data-phone=', s) > 0 then
+                    begin
+                      re1.Expression := 'data-phone="(.*?)">';
+                      ph := ''; //телефон
+                      if re1.Exec(s) then
+                        repeat
+                          if (Pos('.', re1.Match[1]) = 0) and (Length(re1.Match[1]) > 9) then ph := ph + ';' + re1.Match[1];
+                        until not re1.ExecNext;
+                    end;
                 end;
+                ph := StringReplace(ph, '<span class=\"block\">', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '<\/span>', ';', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '+', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                if (Length(ph) = 11) and (Copy(ph, 1, 1) = '7') then ph := '8' + copy(ph, 2, 10);
+                re1.Expression := '"block brkword xx-large">(.*?)</span>';    //имя
+                re1.Exec(s);
+                nm := re1.Match[1];
+                re1.Expression := 'show-map-link" href=""><strong>(.*?)</strong>';    //город
+                re1.Exec(s);
+                ct := re1.Match[1];
+                lst2.Add(nm + ';' + ct + ';' + ph);
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                data_list.Cells[0, lst1.Count - i] := nm;
+                data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+                FreeAndNil(IdHTTP);
+              except
+                data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
               end;
           end;
       end;
@@ -191,15 +184,13 @@ begin
     1:    //Колёса
       begin
         Link := Edit3.Text;
-        if Pos('?', Link) > 0 then
-          st := '&'
-        else
-          st := '?';
+        if Pos('?', Link) > 0 then st := '&'
+        else st := '?';
         re1.Expression := 'le"><a href="/a/show/(.*?)" cla';
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
-          begin
+          try
             s := IdHTTP.Get(Link + st + 'page=' + IntToStr(i));
             s := Copy(s, 1, Pos('Авто в Казахстане', s));
             if re1.Exec(s) then    //собираем ID объявлений
@@ -209,6 +200,8 @@ begin
             i := i + 1;
             Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
             if (Pos('следую', s) = 0) or (Pos('gray right-arrow', s) > 0) then flag := False;
+          except
+            Continue;
           end;
         for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
           if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
@@ -220,52 +213,45 @@ begin
         Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
-            if stop_flag then
-              Break
+            if stop_flag then Break
             else
-              begin
-                try
+              try
+                t := IdHTTP.Get('https://kolesa.kz/a/show/' + lst1.Strings[i]);
+                s := IdHTTP.Get('http://kolesa.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
+                re1.Expression := 'phone":"(.*?)"}';        //Телефон
+                re1.Exec(s);
+                ph := StringReplace(re1.Match[1], '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
+                re1.Expression := 'Город</dt>(.*?)dd>';     //Город
+                re1.Exec(t);
+                ct := Trim(re1.Match[1]);
+                re1.Expression := 'clearfix">(.*?)</';
+                re1.Exec(ct);
+                ct := Trim(re1.Match[1]);
+                nm := IdHTTP.Get('https://kolesa.kz/comment/ajax-comments/' + lst1.Strings[i]);
+                if Pos('Комментариев пока нет', s) = 0 then
                   begin
-                    t := IdHTTP.Get('https://kolesa.kz/a/show/' + lst1.Strings[i]);
-                    s := IdHTTP.Get('http://kolesa.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
-                    re1.Expression := 'phone":"(.*?)"}';        //Телефон
-                    re1.Exec(s);
-                    ph := StringReplace(re1.Match[1], '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
-                    re1.Expression := 'Город</dt>(.*?)dd>';     //Город
-                    re1.Exec(t);
-                    ct := Trim(re1.Match[1]);
-                    re1.Expression := 'clearfix">(.*?)</';
-                    re1.Exec(ct);
-                    ct := Trim(re1.Match[1]);
-                    nm := IdHTTP.Get('https://kolesa.kz/comment/ajax-comments/' + lst1.Strings[i]);
-                    if Pos('Комментариев пока нет', s) = 0 then
-                      begin
-                        re1.Expression := 'class="owner">(.*?)</';
-                        re1.Exec(nm);
-                        nm := Trim(re1.Match[1]);
-                      end
-                    else
-                      nm := 'Нет данных';
-                    lst2.Add(nm + ';' + ct + ';' + ph);
-                    Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
-                    ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
-                    data_list.Cells[0, lst1.Count - i] := nm;
-                    data_list.Cells[1, lst1.Count - i] := ct;
-                    data_list.Cells[2, lst1.Count - i] := ph;
-                  end;
-                except
-                  begin
-                    data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
-                    data_list.Cells[1, lst1.Count - i] := 'Ошибка';
-                    data_list.Cells[2, lst1.Count - i] := 'Ошибка';
-                    Continue;
-                  end;
-                end;
+                    re1.Expression := 'class="owner">(.*?)</';
+                    re1.Exec(nm);
+                    nm := Trim(re1.Match[1]);
+                  end
+                else
+                  nm := 'Нет данных';
+                lst2.Add(nm + ';' + ct + ';' + ph);
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                data_list.Cells[0, lst1.Count - i] := nm;
+                data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+              except
+                data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
               end;
           end;
       end;
@@ -273,15 +259,13 @@ begin
     2:    //Крыша
       begin
         Link := Edit3.Text;
-        if Pos('?', Link) > 0 then
-          st := '&'
-        else
-          st := '?';
+        if Pos('?', Link) > 0 then st := '&'
+        else st := '?';
         re1.Expression := 'link" href="/a/show/(.*?)" title';
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
-          begin
+          try
             s := IdHTTP.Get(Link + st + 'page=' + IntToStr(i));
             s := Copy(s, 1, Pos('Недвижимость в Казахстане', s));
             if re1.Exec(s) then    //собираем ID объявлений
@@ -291,6 +275,8 @@ begin
             i := i + 1;
             Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
             if Pos('Дальше', s) = 0 then flag := False;
+          except
+            Continue;
           end;
         for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
           if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
@@ -302,52 +288,45 @@ begin
         Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
-            if stop_flag then
-              Break
+            if stop_flag then Break
             else
-              begin
-                try
+              try
+                t := IdHTTP.Get('https://krisha.kz/a/show/' + lst1.Strings[i]);
+                s := IdHTTP.Get('http://krisha.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
+                re1.Expression := '\[(.*?)\]';        //Телефон
+                re1.Exec(s);
+                ph := StringReplace(re1.Match[1], '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
+                re1.Expression := 'a-where-region">(.*?)</div>';        //Город
+                re1.Exec(t);
+                ct := Trim(re1.Match[1]);
+                if Pos('link-underlined"', t) > 0 then    //Имя
                   begin
-                    t := IdHTTP.Get('https://krisha.kz/a/show/' + lst1.Strings[i]);
-                    s := IdHTTP.Get('http://krisha.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
-                    re1.Expression := '\[(.*?)\]';        //Телефон
-                    re1.Exec(s);
-                    ph := StringReplace(re1.Match[1], '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
-                    re1.Expression := 'a-where-region">(.*?)</div>';        //Город
+                    re1.Expression := 'link-underlined">(.*?)</a>';
                     re1.Exec(t);
-                    ct := Trim(re1.Match[1]);
-                    if Pos('link-underlined"', t) > 0 then    //Имя
-                      begin
-                        re1.Expression := 'link-underlined">(.*?)</a>';
-                        re1.Exec(t);
-                        nm := Trim(re1.Match[1]);
-                        nm := StringReplace(nm, ',', ' ', [rfReplaceAll, rfIgnoreCase]);
-                        nm := StringReplace(nm, ';', ' ', [rfReplaceAll, rfIgnoreCase]);
-                        nm := Trim(StringReplace(nm, '&quot', '', [rfReplaceAll, rfIgnoreCase]));
-                      end
-                    else
-                      nm := 'Хозяин';
-                    lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
-                    Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
-                    ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
-                    data_list.Cells[0, lst1.Count - i] := nm;
-                    data_list.Cells[1, lst1.Count - i] := ct;
-                    data_list.Cells[2, lst1.Count - i] := ph;
-                  end;
-                except
-                  begin
-                    data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
-                    data_list.Cells[1, lst1.Count - i] := 'Ошибка';
-                    data_list.Cells[2, lst1.Count - i] := 'Ошибка';
-                    Continue;
-                  end;
-                end;
+                    nm := Trim(re1.Match[1]);
+                    nm := StringReplace(nm, ',', ' ', [rfReplaceAll, rfIgnoreCase]);
+                    nm := StringReplace(nm, ';', ' ', [rfReplaceAll, rfIgnoreCase]);
+                    nm := Trim(StringReplace(nm, '&quot', '', [rfReplaceAll, rfIgnoreCase]));
+                  end
+                else
+                  nm := 'Хозяин';
+                lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                data_list.Cells[0, lst1.Count - i] := nm;
+                data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+              except
+                data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
               end;
           end;
       end;
@@ -368,7 +347,7 @@ begin
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
-          begin
+          try
             s := IdHTTP.Get(Link + '?page=' + IntToStr(i) + pLink);
             re1.Expression := 'data-id="(.*?)">';    //собираем ID объявлений
             if re1.Exec(s) then
@@ -383,6 +362,8 @@ begin
             i := i + 1;
             Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
             if Pos('Вперед', s) = 0 then flag := False;
+          except
+            Continue;
           end;
         for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
           if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
@@ -397,50 +378,45 @@ begin
         Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
-            if stop_flag then
-              Break
+            if stop_flag then Break
             else
-              begin
+              try
                 lst4.Add('id=' + lst3.Strings[i]);
                 re1.Expression := 'phones">(.*?)<';
-                try
-                  begin
-                    s := IdHTTP.Post('https://market.kz/ajax/load-phones/', lst4);
-                    t := IdHTTP.Get('https://market.kz/a/' + lst1.Strings[i]);
-                    ph := ''; //телефон
-                    if re1.Exec(s) then
-                      repeat
-                        ph := ph + ';' + re1.Match[1];
-                      until not re1.ExecNext;
-                    ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
-                    if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
-                    re1.Expression := '<dt>Регион</dt><dd>(.*?)</dd>';  //город
-                    re1.Exec(t);
-                    ct := Trim(re1.Match[1]);
-                    re1.Expression := '<a href="/profile/(.*?)</a>';  //имя
-                    re1.Exec(t);
-                    nm := StringReplace(Trim(re1.Match[1]), '/">', ' ', [rfReplaceAll, rfIgnoreCase]);
-                    lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
-                    Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
-                    ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
-                    data_list.Cells[0, lst1.Count - i] := nm;
-                    data_list.Cells[1, lst1.Count - i] := ct;
-                    data_list.Cells[2, lst1.Count - i] := ph;
-                    lst4.Clear;
-                  end;
-                except
-                  begin
-                    data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
-                    data_list.Cells[1, lst1.Count - i] := 'Ошибка';
-                    data_list.Cells[2, lst1.Count - i] := 'Ошибка';
-                    Continue;
-                  end;
-                end;
+                s := IdHTTP.Post('https://market.kz/ajax/load-phones/', lst4);
+                t := IdHTTP.Get('https://market.kz/a/' + lst1.Strings[i]);
+                ph := ''; //телефон
+                if re1.Exec(s) then
+                  repeat
+                    ph := ph + ';' + re1.Match[1];
+                  until not re1.ExecNext;
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
+                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                re1.Expression := '<dt>Регион</dt><dd>(.*?)</dd>';  //город
+                re1.Exec(t);
+                ct := Trim(re1.Match[1]);
+                re1.Expression := '<a href="/profile/(.*?)</a>';  //имя
+                re1.Exec(t);
+                nm := StringReplace(re1.Match[1], '/">', ' ', [rfReplaceAll, rfIgnoreCase]);
+                nm := StringReplace(re1.Match[1], '&amp;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                nm := Trim(StringReplace(re1.Match[1], '&quot;', ' ', [rfReplaceAll, rfIgnoreCase]));
+                lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                data_list.Cells[0, lst1.Count - i] := nm;
+                data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+                lst4.Clear;
+              except
+                data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
               end;
           end;
         FreeAndNil(lst3);
@@ -463,7 +439,7 @@ begin
         re1.Expression := 'div><a href="(.*?)" data-qaid';
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
-          begin
+          try
             s := IdHTTP.Get(Link + ';' + IntToStr(i) + pLink);
             s := Copy(s, 1, Pos('ProductRecommendations', s));
             if re1.Exec(s) then    //собираем ID объявлений
@@ -473,6 +449,8 @@ begin
             i := i + 1;
             Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
             if Pos('Вперед', s) = 0 then flag := False;
+          except
+            Continue;
           end;
         for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
           if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
@@ -484,67 +462,62 @@ begin
         Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
-            if stop_flag then
-              Break
+            if stop_flag then Break
             else
-              begin
-                try
+              try
+                s := IdHTTP.Get(lst1.Strings[i]);
+                s := Copy(s, 1, Pos('Добавить в избранное', s));
+                s := Copy(s, Pos('data-pl-phones="', s), Pos('data-pl-main-phone=', s) - Pos('data-pl-phones="', s));
+                re1.Expression := '&#34;\+(.*?)&#34;,';        //Телефон
+                ph := ''; //телефон
+                if re1.Exec(s) then
+                  repeat
+                    ph := ph + ';' + re1.Match[1];
+                  until not re1.ExecNext;
+                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                {re1.Expression := 'a-where-region">(.*?)</div>';        //Город
+                re1.Exec(t);
+                ct := Trim(re1.Match[1]);
+                if Pos('link-underlined"', t) > 0 then    //Имя
                   begin
-                    s := IdHTTP.Get(lst1.Strings[i]);
-                    s := Copy(s, 1, Pos('Добавить в избранное', s));
-                    s := Copy(s, Pos('data-pl-phones="', s), Pos('data-pl-main-phone=', s) - Pos('data-pl-phones="', s));
-                    re1.Expression := '&#34;\+(.*?)&#34;,';        //Телефон
-                    ph := ''; //телефон
-                    if re1.Exec(s) then
-                      repeat
-                        ph := ph + ';' + re1.Match[1];
-                      until not re1.ExecNext;
-                    ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                    ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                    if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
-                    {re1.Expression := 'a-where-region">(.*?)</div>';        //Город
+                    re1.Expression := 'link-underlined">(.*?)</a>';
                     re1.Exec(t);
-                    ct := Trim(re1.Match[1]);
-                    if Pos('link-underlined"', t) > 0 then    //Имя
-                      begin
-                        re1.Expression := 'link-underlined">(.*?)</a>';
-                        re1.Exec(t);
-                        nm := Trim(re1.Match[1]);
-                      end
-                    else
-                      nm := 'Хозяин';}
-                    lst2.Add(ph); //добавляем данные в итоговый список
-                    //lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
-                    Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
-                    ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
-                    //data_list.Cells[0, lst1.Count - i] := nm;
-                    //data_list.Cells[1, lst1.Count - i] := ct;
-                    data_list.Cells[2, lst1.Count - i] := ph;
-                  end;
-                except
-                  begin
-                    //data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
-                    //data_list.Cells[1, lst1.Count - i] := 'Ошибка';
-                    data_list.Cells[2, lst1.Count - i] := 'Ошибка';
-                    Continue;
-                  end;
-                end;
+                    nm := Trim(re1.Match[1]);
+                  end
+                else
+                  nm := 'Хозяин';}
+                lst2.Add(ph); //добавляем данные в итоговый список
+                //lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                //data_list.Cells[0, lst1.Count - i] := nm;
+                //data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+              except
+                //data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                //data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
               end;
           end;
       end;
     5:    //2gis
       begin
-        if Pos('?', Edit3.Text) > 0 then Link := TIdURI.URLEncode(Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1))
-        else Link := TIdURI.URLEncode(Edit3.Text);
+        {if Pos('?', Edit3.Text) > 0 then Link := TIdURI.URLEncode(Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1))
+        else Link := TIdURI.URLEncode(Edit3.Text);}
+        if Pos('?', Edit3.Text) > 0 then Link := Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1)
+        else Link := Edit3.Text;
         pLink := Copy(Link, 1, Pos('search', Link) - 1);
         st := '/page/';
         re1.Expression := '/firm/(.*?)"';
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
-          begin
+          try
             s := IdHTTP.Get(Link + st + IntToStr(i));
             if re1.Exec(s) then    //собираем ID
               repeat
@@ -553,6 +526,8 @@ begin
             i := i + 1;
             Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных
             if Pos('pagination__arrow _right _disabled', s) > 0 then flag := False;
+          except
+            Continue;
           end;
         for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
           if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
@@ -564,53 +539,47 @@ begin
         Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
           begin
-            if stop_flag then
-              Break
+            if stop_flag then Break
             else
-              begin
-                try
-                  begin
-                    s := IdHTTP.Get(pLink + 'firm/' + lst1.Strings[i]);
-                    t := s;
-                    if Pos('Контакты', t) > 0 then t := Copy(t, Pos('Контакты', t), length(t) - Pos('Контакты', t));
-                    if Pos('tel:', s) = 0 then
-                      Continue;
-                    re1.Expression := '"tel:(.*?)" cla';        //Телефон
-                    if re1.Exec(t) then
-                      repeat
-                        ph := ph + ';' + re1.Match[1];
-                      until not re1.ExecNext;
-                    if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
-                    if pos('cardAddressName', s) > 0 then re1.Expression := 'cardAddressName">(.*?)</di'  //Город
-                    else if pos('addressLink _undashed', s) > 0 then re1.Expression := 'addressLink _undashed">(.*?)</a'
-                    else re1.Expression := 'geo/\d{17}">(.*?)</a';
-                    re1.Exec(s);
-                    ct := StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]);
-                    ct := StringReplace(ct, ',', '', [rfReplaceAll, rfIgnoreCase]);
-                    ct := Trim(StringReplace(ct, '<br/>', ' ', [rfReplaceAll, rfIgnoreCase]));
-                    if pos('cardHeaderName', s) > 0 then re1.Expression := 'cardHeaderName">(.*?)</h'      //Имя
-                    else re1.Expression := 'headerNameText">(.*?)</h';
-                    re1.Exec(s);
-                    nm := StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]);
-                    nm := StringReplace(re1.Match[1], '&&#x60;', ' ', [rfReplaceAll, rfIgnoreCase]);
-                    nm := Trim(StringReplace(nm, ',', '', [rfReplaceAll, rfIgnoreCase]));
-                    lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
-                    Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
-                    ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
-                    data_list.Cells[0, lst2.Count] := nm;
-                    data_list.Cells[1, lst2.Count] := ct;
-                    data_list.Cells[2, lst2.Count] := ph;
-                    ph := '';
-                  end;
-                except
-                  begin         //иначе ошибка
-                    lst2.Add(';'); //добавляем ошибочные данные в итоговый список
-                    data_list.Cells[0, lst2.Count] := 'Ошибка';
-                    data_list.Cells[1, lst2.Count] := 'Ошибка';
-                    data_list.Cells[2, lst2.Count] := 'Ошибка';
-                    Continue;
-                  end;
-                end;
+              try
+                s := IdHTTP.Get(pLink + 'firm/' + lst1.Strings[i]);
+                t := s;
+                if Pos('Контакты', t) > 0 then t := Copy(t, Pos('Контакты', t), length(t) - Pos('Контакты', t));
+                if (only_phone_2gis.Visible = True) and (only_phone_2gis.Checked) then if Pos('tel:', s) = 0 then Continue;
+                re1.Expression := '"tel:(.*?)" cla';        //Телефон
+                if re1.Exec(t) then
+                  repeat
+                    ph := ph + ';' + re1.Match[1];
+                  until not re1.ExecNext;
+                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                if pos('cardAddressName', s) > 0 then re1.Expression := 'cardAddressName">(.*?)</di'  //Город
+                else if pos('addressLink _undashed', s) > 0 then re1.Expression := 'addressLink _undashed">(.*?)</a'
+                else re1.Expression := 'geo/\d{17}">(.*?)</a';
+                re1.Exec(s);
+                ct := StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                ct := StringReplace(ct, ',', '', [rfReplaceAll, rfIgnoreCase]);
+                ct := Trim(StringReplace(ct, '<br/>', ' ', [rfReplaceAll, rfIgnoreCase]));
+                if pos('cardHeaderName', s) > 0 then re1.Expression := 'cardHeaderName">(.*?)</h'      //Имя
+                else re1.Expression := 'headerNameText">(.*?)</h';
+                re1.Exec(s);
+                nm := StringReplace(re1.Match[1], '&nbsp;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                nm := StringReplace(re1.Match[1], '&amp;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                nm := StringReplace(re1.Match[1], '&&#x60;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                nm := StringReplace(re1.Match[1], '&#x60;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                nm := Trim(StringReplace(nm, ',', '', [rfReplaceAll, rfIgnoreCase]));
+                lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                data_list.Cells[0, lst2.Count] := nm;
+                data_list.Cells[1, lst2.Count] := ct;
+                data_list.Cells[2, lst2.Count] := ph;
+                ph := '';
+              except       //иначе ошибка
+                lst2.Add(';'); //добавляем ошибочные данные в итоговый список
+                data_list.Cells[0, lst2.Count] := 'Ошибка';
+                data_list.Cells[1, lst2.Count] := 'Ошибка';
+                data_list.Cells[2, lst2.Count] := 'Ошибка';
+                Continue;
               end;
           end;
       end;
@@ -638,6 +607,8 @@ var
   IdSSL: TIdSSLIOHandlerSocketOpenSSL;
   s: string;
 begin
+  //Edit3.SelStart := 0;
+  //Edit3.SelLength := 0;
   Label4.Caption := 'Проверка ссылки';
   IdHTTP := TIdHTTP.Create;
   IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
@@ -651,34 +622,37 @@ begin
   IdHTTP.Request.CustomHeaders.Add('Referer: ' + Edit3.Text);
   if Length(Edit3.Text) > 0 then
     try
-      s := IdHTTP.Get(TIdURI.URLEncode(Edit3.Text));
-      if (pos('https://www.olx.kz/', Edit3.Text) > 0)
-        or (pos('https://kolesa.kz/', Edit3.Text) > 0)
-        or (pos('https://krisha.kz/', Edit3.Text) > 0)
-        or (pos('https://market.kz/', Edit3.Text) > 0)
-        or (pos('satu.kz/', Edit3.Text) > 0)
-        or (pos('https://2gis.kz/', Edit3.Text) > 0) then
+      //s := IdHTTP.Get(TIdURI.URLEncode(Edit3.Text));
+      s := IdHTTP.Get(Edit3.Text);
+      if (pos('https://www.olx.kz', Edit3.Text) > 0)
+        or (pos('https://kolesa.kz', Edit3.Text) > 0)
+        or (pos('https://krisha.kz', Edit3.Text) > 0)
+        or (pos('https://market.kz', Edit3.Text) > 0)
+        or (pos('satu.kz', Edit3.Text) > 0)
+        or (pos('https://2gis.kz', Edit3.Text) > 0) then
         begin
           start_btn.Enabled := True;
           Label4.Caption := 'Ссылка исправна';
           Edit3.Color := clMoneyGreen;
-          if pos('https://www.olx.kz/', Edit3.Text) > 0 then
+          if pos('https://www.olx.kz', Edit3.Text) > 0 then
             site := 0
-          else if pos('https://kolesa.kz/', Edit3.Text) > 0 then
+          else if pos('https://kolesa.kz', Edit3.Text) > 0 then
             site := 1
-          else if pos('https://krisha.kz/', Edit3.Text) > 0 then
+          else if pos('https://krisha.kz', Edit3.Text) > 0 then
             site := 2
-          else if pos('https://market.kz/', Edit3.Text) > 0 then
+          else if pos('https://market.kz', Edit3.Text) > 0 then
             site := 3
-          else if pos('https://2gis.kz/', Edit3.Text) > 0 then
-            site := 5;
+          else if pos('https://2gis.kz', Edit3.Text) > 0 then
+            begin
+              site := 5;
+              all_2gis.Visible := True;
+              only_phone_2gis.Visible := True;
+            end
         end
     except
-      begin
-        start_btn.Enabled := False;
-        Label4.Caption := 'Неверная ссылка';
-        Edit3.Color := clFuchsia;
-      end;
+      start_btn.Enabled := False;
+      Label4.Caption := 'Неверная ссылка';
+      Edit3.Color := clFuchsia;
     end
   else if Edit3.Text = '' then
     begin
@@ -728,6 +702,8 @@ begin
   stop_btn.Visible := False;
   ProgressBar1.Visible := False;
   ProgressBar1.Position := 0;
+  all_2gis.Visible := False;
+  only_phone_2gis.Visible := False;
   with data_list do
     for i := FixedRows to RowCount - 1 do
       Rows[i].Clear;
@@ -743,7 +719,7 @@ begin
   Label4.Caption := 'Сохранение';
   if SaveDialog1.Execute then
     begin
-      if FileExists(SaveDialog1.FileName) then
+      if FileExists(SaveDialog1.FileName) then    //если такой файл уже есть
         begin
           if MessageDlg(SaveDialog1.FileName + ' уже существует.' + #13#10 + 'Заменить?', mtConfirmation, mbYesNoCancel, 0) = mrYes then
             lst2.SaveToFile(SaveDialog1.FileName);
