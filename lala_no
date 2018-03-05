@@ -1,0 +1,102 @@
+unit FormTesseractOCRImage;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, System.UITypes, System.Types, System.IOUtils, Vcl.Controls, Vcl.Forms,
+  Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.ComCtrls, Vcl.Samples.Spin, TesseractOCR,
+  PNGImage, IdHTTP, IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL,
+  IdBaseComponent, IdAntiFreezeBase, Vcl.IdAntiFreeze;
+
+type
+  TTesseractOCRImageForm = class(TForm)
+    memText: TMemo;
+    btnOpenFile: TButton;
+    Image1: TImage;
+    Memo1: TMemo;
+    IdAntiFreeze1: TIdAntiFreeze;
+    procedure btnOpenFileClick(Sender: TObject);
+    procedure OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
+  private
+    { Private declarations }
+    
+    
+  public
+    { Public declarations }
+
+  end;
+
+var
+  TesseractOCRImageForm: TTesseractOCRImageForm;
+      lst1: TStringList;
+    PNG: TPNGImage;
+
+implementation
+uses
+  tesseractocr.pagelayout,
+  tesseractocr.utils,
+  tesseractocr.capi;
+
+{$R *.dfm}
+
+{ TTesseractOCRImageForm }
+
+procedure TTesseractOCRImageForm.btnOpenFileClick(Sender: TObject);
+var
+  IdHTTP: TIdHTTP;
+  IdSSL: TIdSSLIOHandlerSocketOpenSSL;
+  Stream: TMemoryStream;
+  Result: string;
+  
+  i: Integer;
+
+begin
+  IdHTTP := TIdHTTP.Create;
+  IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+  IdHTTP.IOHandler := IdSSL;
+  IdHTTP.HandleRedirects := True;
+  IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+  IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+  IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+  IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
+  FreeAndNil(Tesseract);
+  FreeAndNil(PNG);
+  //Stream.Free;
+  lst1 := TStringList.Create;
+  for i := Memo1.Lines.Count - 1 downto 0 do
+    try
+      Stream := TMemoryStream.Create;
+      Tesseract := TTesseractOCR4.Create;
+      Tesseract.OnRecognizeEnd := OnRecognizeEnd;
+      Tesseract.Initialize('tessdata\', 'eng', oemDefault);
+      try
+        IdHTTP.Get('https://lalafo.kg/ajax/mobile/' + memo1.Lines.Strings[i], Stream);
+      except
+      end;
+      Stream.Position := 0;
+      PNG := TPNGImage.Create;
+      PNG.LoadFromStream(Stream);
+    finally
+      Stream.Free;
+      Image1.Picture.Bitmap.Assign(PNG);
+      Image1.Picture.Bitmap.Height:= Image1.Picture.Bitmap.Height * 2;
+      Image1.Picture.SaveToFile(IntToStr(i + 1) + '1.png');
+      //if Tesseract.Busy then Sleep(2000);
+      if Tesseract.SetImage(IntToStr(i + 1) + '1.png') then Tesseract.Recognize;
+      //FreeAndNil(Tesseract);
+      FreeAndNil(PNG);
+      Sleep(2000);
+    end;
+end;
+
+procedure TTesseractOCRImageForm.OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
+begin
+  //memText.Lines.Add(Tesseract.UTF8Text);
+  //FreeAndNil(Tesseract);
+  //lst1.Add(Tesseract.UTF8Text);
+  memText.Text := memText.Text + Tesseract.UTF8Text;
+
+end;
+
+end.
