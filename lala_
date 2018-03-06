@@ -1,0 +1,91 @@
+    3:    //lalafo
+      begin
+        Link := Edit3.Text;
+        lst3 := TStringList.Create; //список ID объявлений
+        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+        while flag do
+          try
+            s := IdHTTP.Get(Link + '?page=' + IntToStr(i) + pLink);
+            re1.Expression := 'data-id="(.*?)">';    //собираем ID объявлений
+            if re1.Exec(s) then
+              repeat
+                lst3.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            re1.Expression := 'holder" href="(.*?)">';    //собираем расширенные ID объявлений с названиями в транслите
+            if re1.Exec(s) then
+              repeat
+                lst1.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            i := i + 1;
+            Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
+            if Pos('pagn-last disabled', s) > 0 then flag := False;
+          except
+            Continue;
+          end;
+        for i := lst1.Count - 1 downto 0 do       //удаление дубликатов
+          if lst1.IndexOf(lst1.Strings[i]) < i then lst1.Delete(i);
+        for i := lst3.Count - 1 downto 0 do       //удаление дубликатов
+          if lst3.IndexOf(lst3.Strings[i]) < i then lst3.Delete(i);
+        Edit1.Text := IntToStr(lst1.Count); //показываем кол-во найденных уникальных объявлений
+        ProgressBar1.Position := 0;
+        ProgressBar1.Visible := True;
+
+        Tesseract := TTesseractOCR4.Create;
+        Tesseract.OnRecognizeEnd := OnRecognizeEnd;
+        Tesseract.Initialize('tessdata\', 'eng', oemDefault);
+        stop_btn.Visible := True;
+        Label4.Caption := 'Загрузка данных';
+        for i := lst1.Count - 1 downto 0 do
+          begin
+            if stop_flag then Break
+            else
+              try
+			    s := IdHTTP.Get('https://lalafo.kg' + lst1.Strings[i]);
+                try
+                  Stream := TMemoryStream.Create;
+                  IdHTTP.Get('https://lalafo.kg/ajax/mobile/' + lst3.Strings[i], Stream);
+                  Stream.Position := 0;
+                  png := TPNGImage.Create;
+                  png.LoadFromStream(Stream);
+                finally
+                  Stream.Free;
+                  Image1.Picture.Bitmap.Assign(png);
+                  Image1.Picture.Bitmap.Height:= Image1.Picture.Bitmap.Height * 3;
+                  Image1.Picture.SaveToFile(IntToStr(i + 1) + '1.png');
+                  if Tesseract.SetImage(IntToStr(i + 1) + '1.png') then
+                    begin
+                      Tesseract.PageSegMode := TessPageSegMode(14);
+                      Tesseract.Recognize;
+                    end;
+                  FreeAndNil(png);
+                end;
+
+                re1.Expression := 'rop="name">(.*?)</dd>';  //город
+                re1.Exec(s);
+                ct := Trim(re1.Match[1]);
+                re1.Expression := '/user/\d{6,}(.*?)</a';  //имя
+                re1.Exec(s);
+                nm := StringReplace(re1.Match[1], '&amp;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                nm := Trim(StringReplace(nm, '&quot;', ' ', [rfReplaceAll, rfIgnoreCase]));
+                lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
+                Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
+                ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
+                data_list.Cells[0, lst1.Count - i] := nm;
+                data_list.Cells[1, lst1.Count - i] := ct;
+                data_list.Cells[2, lst1.Count - i] := ph;
+                lst4.Clear;
+              except
+                data_list.Cells[0, lst1.Count - i] := 'Ошибка'; //иначе ошибка
+                data_list.Cells[1, lst1.Count - i] := 'Ошибка';
+                data_list.Cells[2, lst1.Count - i] := 'Ошибка';
+                Continue;
+              end;
+          end;
+        FreeAndNil(lst3);
+      end;
+
+
+procedure TTesseractOCRImageForm.OnRecognizeEnd(Sender: TObject; ACanceled: Boolean);
+begin
+  ph := Tesseract.UTF8Text;
+end;
