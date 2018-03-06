@@ -403,8 +403,8 @@ begin
                 re1.Expression := '<a href="/profile/(.*?)</a>';  //имя
                 re1.Exec(t);
                 nm := StringReplace(re1.Match[1], '/">', ' ', [rfReplaceAll, rfIgnoreCase]);
-                nm := StringReplace(re1.Match[1], '&amp;', ' ', [rfReplaceAll, rfIgnoreCase]);
-                nm := Trim(StringReplace(re1.Match[1], '&quot;', ' ', [rfReplaceAll, rfIgnoreCase]));
+                nm := StringReplace(nm, '&amp;', ' ', [rfReplaceAll, rfIgnoreCase]);
+                nm := Trim(StringReplace(nm, '&quot;', ' ', [rfReplaceAll, rfIgnoreCase]));
                 lst2.Add(nm + ';' + ct + ';' + ph); //добавляем данные в итоговый список
                 Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
                 ProgressBar1.Position := Round((lst2.Count / lst1.Count) * 100);
