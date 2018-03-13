@@ -1,0 +1,33 @@
+this.ajxsign = function(c) {
+        var u = 0,	
+            n = 1,
+            d = 2,
+            g = n << d,
+            q = [],		//пустой массив
+            k = [],		//пустой массив
+            t = function(h, f) {
+                return Math.floor(Math.random() * (f - h + n)) + h
+            },
+            s = function(f) {
+                return parseInt(f).toString(g << (g - d))
+            },
+            b = function(i, h, f) {
+                while (i.length < f) {
+                    i = h + "" + i
+                }
+                return i
+            },
+            a = function() {
+                return t(u, g << (g * d + d) << g)
+            },
+            o = function(f) {
+                return b(s(f), u + "", g)
+            };
+        for (var l = u; l < d; l++) {
+            q.push(a());
+            k.push(o(q[l]))
+        }
+        q.splice(n, u, c);
+        k.splice(n, u, md5(q.join("")));
+        return k.join("")
+    }
