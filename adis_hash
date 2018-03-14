@@ -1,0 +1,66 @@
+procedure TForm1.Button4Click(Sender: TObject);
+var
+  s, id: string;
+  lst: TStringList;
+  IdHTTP: TIdHTTP;
+begin
+  id := Edit1.Text;
+  lst := TStringList.Create;
+  IdHTTP := TIdHTTP.Create;
+  IdHTTP.HandleRedirects := True;
+  IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36';
+  IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
+  lst.Add('res_id=' + id);
+  lst.Add('sign=' + GetHash(id));
+  s := IdHTTP.Post('http://bishkek.adiso.kg/ajax/getPhone', lst);
+  Memo1.Text := s;
+end;
+
+function GetHash(id: string): string;
+var
+  i: Single;
+  a, s, t: string;
+begin
+  i := StrToFloat(id);  //главный входной параметр
+  s := IntToStr(Math.Floor(65537 * Random)); // в uses Math прописать
+  t := IntToStr(Math.Floor(65537 * Random));
+  a := s + FloatToStr(i) + t;
+  Result := fixedLenHex(StrToInt(s), 4) + md5(a) + fixedLenHex(StrToInt(t), 4);  //в uses IdHashMessageDigest для md5
+end;
+
+function padLeft(src, padChar: string; len: Integer): string;
+begin
+  while Length(src) < len do
+    src := padChar + src;
+  Result := src;
+end;
+
+function fixedLenHex(src, len: Integer): string;
+begin
+  Result := padLeft(fromDec(src, 16), '0', len);  //в JS есть простая функция .toString(16), а тут не очень простая
+end;
+
+function FromDec(n, r: longint): string;  //перевод из 10 в 16 систему счисления
+var
+  s: string;
+const
+  digit: string[16] = '0123456789abcdef';
+begin
+  s := '';
+  repeat
+    s := digit[(n mod r) + 1] + s;
+    n := n div r;
+  until n = 0;
+  result := AnsiLowerCase(s);
+end;
+
+function md5(s: string): string;
+begin
+  Result := '';
+  with TIdHashMessageDigest5.Create do
+    try
+      Result := AnsiLowerCase(HashStringAsHex(s));
+    finally
+      Free;
+    end;
+end;
