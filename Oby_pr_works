@@ -7,7 +7,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, RegExpr, IdHTTP, Vcl.StdCtrls,
   IdBaseComponent, IdAntiFreezeBase, Vcl.IdAntiFreeze, Vcl.OleCtrls, SHDocVw,
   Vcl.ComCtrls, IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL,
-  Vcl.Grids, IdURI, System.UITypes;
+  Vcl.Grids, IdURI, System.UITypes, IdSSLOpenSSLHeaders, IdCTypes;
 
 type
   TForm1 = class(TForm)
@@ -48,6 +48,14 @@ type
     { Public declarations }
   end;
 
+type
+  TCustomIdHTTP = class(TIdHTTP)
+  public
+    constructor Create(AOwner: TComponent);
+  private
+    procedure OnStatusInfoEx(ASender: TObject; const AsslSocket: PSSL; const AWhere, Aret: TIdC_INT; const AType, AMsg: String);
+  end;
+
 var
   lst2: TStringList;
   stop_flag: Boolean;
@@ -58,10 +66,29 @@ implementation
 
 {$R *.dfm}
 
+constructor TCustomIdHTTP.Create(AOwner: TComponent);
+begin
+  IOHandler := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
+  with IOHandler as TIdSSLIOHandlerSocketOpenSSL do
+    begin
+      OnStatusInfoEx := Self.OnStatusInfoEx;
+      SSLOptions.Method := sslvSSLv23;
+      SSLOptions.SSLVersions := [sslvTLSv1_2, sslvTLSv1_1, sslvTLSv1];
+    end;
+  inherited Create(AOwner);
+end;
+
+procedure TCustomIdHTTP.OnStatusInfoEx(ASender: TObject; const AsslSocket: PSSL; const AWhere, Aret: TIdC_INT;
+  const AType, AMsg: String);
+begin
+  SSL_set_tlsext_host_name(AsslSocket, Request.Host);
+end;
+
 procedure TForm1.start_btnClick(Sender: TObject);
 var
   i: Integer;        //PageCount
   IdHTTP: TIdHTTP;
+  MyHTTP: TCustomIdHTTP;
   IdSSL: TIdSSLIOHandlerSocketOpenSSL;
   s, st, t, ph, nm, ct, Link, pLink: string;    //Phone, Name, City
   lst1, lst3, lst4: TStringList;
@@ -95,6 +122,8 @@ begin
         while flag do
           try
             s := IdHTTP.Get(Link + '?page=' + IntToStr(i));
+            if Pos('<a href="https://www.olx.kz/obyavlenie/', s) = 0 then
+              re1.Expression := '<a class="link" href="https://www.olx.kz/obyavlenie/(.*?).html';
             if re1.Exec(s) then    //собираем ID объявлений
               repeat
                 lst1.Add(re1.Match[1]);
@@ -184,15 +213,13 @@ begin
     1:    //Колёса
       begin
         Link := StringReplace(Edit3.Text, 'https://', 'https://m.', [rfReplaceAll, rfIgnoreCase]);
-        if Pos('?', Link) > 0 then st := '&'
-        else st := '?';
+        if Pos('?', Link) > 0 then st := '&' else st := '?';
         re1.Expression := '<a href="/a/show/(.*?)" cla';
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
           try
             s := IdHTTP.Get(Link + st + 'page=' + IntToStr(i));
-            //s := Copy(s, 1, Pos('Авто в Казахстане', s));
             if re1.Exec(s) then    //собираем ID объявлений
               repeat
                 lst1.Add(re1.Match[1]);
@@ -212,7 +239,6 @@ begin
         stop_btn.Visible := True;
         Label4.Caption := 'Загрузка данных';
         for i := lst1.Count - 1 downto 0 do
-        //for i := 1 to 1 do
           begin
             if stop_flag then Break
             else
@@ -230,18 +256,18 @@ begin
                 ph := StringReplace(ph, ':', ';', [rfReplaceAll, rfIgnoreCase]);
                 ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
                 ct := Copy(t, Pos('Город', t), Pos('Кузов', t) - Pos('Город', t) + 5);
-                Memo1.Text := ct;
                 re1.Expression := '<div>(.*?)</div>';     //Город
                 re1.Exec(ct);
                 ct := Trim(re1.Match[1]);
-                {nm := IdHTTP.Get('https://kolesa.kz/comment/ajax-comments/' + lst1.Strings[i]);
-                if Pos('Комментариев пока нет', s) = 0 then
+                nm := IdHTTP.Get('https://m.kolesa.kz/a/comments/' + lst1.Strings[i]);
+                if Pos('lft-bl gr', nm) > 0 then
                   begin
-                    re1.Expression := 'class="owner">(.*?)</';
+                    re1.Expression := 'bl gr">(.*?)</div';
                     re1.Exec(nm);
-                    nm := Trim(re1.Match[1]);
+                    nm := StringReplace(re1.Match[1], #13#10, '', [rfReplaceAll, rfIgnoreCase]);
+                    nm := Trim(Copy(nm, 1, Pos('для', nm) - 1));
                   end
-                else}
+                else
                   nm := 'Нет данных';
                 lst2.Add(nm + ';' + ct + ';' + ph);
                 Edit2.Text := IntToStr(lst2.Count); //показываем кол-во найденных уникальных номеров
@@ -260,23 +286,21 @@ begin
 
     2:    //Крыша
       begin
-        Link := Edit3.Text;
-        if Pos('?', Link) > 0 then st := '&'
-        else st := '?';
-        re1.Expression := 'link" href="/a/show/(.*?)" title';
+        Link := StringReplace(Edit3.Text, 'https://', 'https://m.', [rfReplaceAll, rfIgnoreCase]);
+        if Pos('?', Link) > 0 then st := '&' else st := '?';
+        re1.Expression := 'data-id="(.*?)"';
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
           try
             s := IdHTTP.Get(Link + st + 'page=' + IntToStr(i));
-            s := Copy(s, 1, Pos('Недвижимость в Казахстане', s));
             if re1.Exec(s) then    //собираем ID объявлений
               repeat
                 lst1.Add(re1.Match[1]);
               until not re1.ExecNext;
             i := i + 1;
             Edit1.Text := IntToStr(lst1.Count);    //показываем кол-во найденных объявлений
-            if Pos('Дальше', s) = 0 then flag := False;
+            if Pos('link-next', s) = 0 then flag := False;
           except
             Continue;
           end;
@@ -293,21 +317,22 @@ begin
             if stop_flag then Break
             else
               try
-                t := IdHTTP.Get('https://krisha.kz/a/show/' + lst1.Strings[i]);
-                s := IdHTTP.Get('http://krisha.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
-                re1.Expression := '\[(.*?)\]';        //Телефон
-                re1.Exec(s);
-                ph := StringReplace(re1.Match[1], '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
+                t := IdHTTP.Get('https://m.krisha.kz/a/show/' + lst1.Strings[i]);
+                s := IdHTTP.Get('http://m.krisha.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
+                re1.Expression := 'tel:(.*?)\"';        //Телефон
+                ph := '';
+                if re1.Exec(s) then
+                  repeat
+                    ph := ph + ';' + re1.Match[1];
+                  until not re1.ExecNext;
                 ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
                 ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
-                re1.Expression := 'a-where-region">(.*?)</div>';        //Город
+                ph := StringReplace(ph, '\', '', [rfReplaceAll, rfIgnoreCase]);
+                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                re1.Expression := '"address">(.*?)</span>';        //Город
                 re1.Exec(t);
                 ct := Trim(re1.Match[1]);
-                if Pos('link-underlined"', t) > 0 then    //Имя
+                if Pos('link-underlined', t) > 0 then    //Имя
                   begin
                     re1.Expression := 'link-underlined">(.*?)</a>';
                     re1.Exec(t);
@@ -335,6 +360,10 @@ begin
 
     3:    //Маркет
       begin
+        FreeAndNil(IdHTTP);
+        FreeAndNil(IdSSL);
+        MyHTTP := TCustomIdHTTP.Create(nil);
+        MyHTTP.HandleRedirects := True;
         if Pos('?', Edit3.Text) = 0 then    //определяем ссылку. Если нет вопросительного знака в ссылке, то берем ссылку, как есть
           begin
             Link := Edit3.Text;
@@ -346,11 +375,11 @@ begin
             pLink := '&' + Copy(Edit3.Text, Pos('?', Edit3.Text) + 1, Length(Edit3.Text) - Pos('?', Edit3.Text) + 1);    //и после
           end;
         lst3 := TStringList.Create; //список ID объявлений
-        IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
-        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+        MyHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
+        MyHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
           try
-            s := IdHTTP.Get(Link + '?page=' + IntToStr(i) + pLink);
+            s := MyHTTP.Get(Link + '?page=' + IntToStr(i) + pLink);
             re1.Expression := 'data-id="(.*?)">';    //собираем ID объявлений
             if re1.Exec(s) then
               repeat
@@ -384,9 +413,10 @@ begin
             else
               try
                 lst4.Add('id=' + lst3.Strings[i]);
+                lst4.Add('modal=1');
                 re1.Expression := 'phones">(.*?)<';
-                s := IdHTTP.Post('https://market.kz/ajax/load-phones/', lst4);
-                t := IdHTTP.Get('https://market.kz/a/' + lst1.Strings[i]);
+                s := MyHTTP.Post('https://market.kz/ajax/load-phones/', lst4);
+                t := MyHTTP.Get('https://market.kz/a/' + lst1.Strings[i]);
                 ph := ''; //телефон
                 if re1.Exec(s) then
                   repeat
@@ -423,6 +453,7 @@ begin
           end;
         FreeAndNil(lst3);
         FreeAndNil(lst4);
+        FreeAndNil(MyHTTP);
       end;
 
     4:    //Satu
@@ -606,15 +637,16 @@ end;
 procedure TForm1.Edit3Change(Sender: TObject);
 var
   IdHTTP: TIdHTTP;
+  MyHTTP: TCustomIdHTTP;
   IdSSL: TIdSSLIOHandlerSocketOpenSSL;
   s: string;
 begin
-  //Edit3.SelStart := 0;
-  //Edit3.SelLength := 0;
   Label4.Caption := 'Проверка ссылки';
   IdHTTP := TIdHTTP.Create;
+  MyHTTP := TCustomIdHTTP.Create(nil);
   IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
   IdHTTP.IOHandler := IdSSL;
+  MyHTTP.HandleRedirects := True;
   IdHTTP.HandleRedirects := True;
   IdHTTP.ProtocolVersion := pv1_1;
   IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
@@ -626,17 +658,18 @@ begin
     try
       //s := IdHTTP.Get(TIdURI.URLEncode(Edit3.Text));
       if (Pos('kolesa', Edit3.Text) > 0)
-        or (Pos('krisha', Edit3.Text) > 0)
-        or (Pos('market', Edit3.Text) > 0) then
+      or (Pos('krisha', Edit3.Text) > 0) then
         s := IdHTTP.Get(StringReplace(Edit3.Text, 'https://', 'https://m.', [rfReplaceAll, rfIgnoreCase]))
+      else if Pos('market', Edit3.Text) > 0 then
+        s := MyHTTP.Get(Edit3.Text)
       else
         s := IdHTTP.Get(Edit3.Text);
-      if (pos('https://www.olx.kz', Edit3.Text) > 0)
-        or (pos('https://kolesa.kz', Edit3.Text) > 0)
-        or (pos('https://krisha.kz', Edit3.Text) > 0)
-        or (pos('https://market.kz', Edit3.Text) > 0)
-        or (pos('satu.kz', Edit3.Text) > 0)
-        or (pos('https://2gis.kz', Edit3.Text) > 0) then
+      if (pos('olx.kz', Edit3.Text) > 0)
+      or (pos('kolesa.kz', Edit3.Text) > 0)
+      or (pos('krisha.kz', Edit3.Text) > 0)
+      or (pos('market.kz', Edit3.Text) > 0)
+      or (pos('satu.kz', Edit3.Text) > 0)
+      or (pos('2gis.kz', Edit3.Text) > 0) then
         begin
           start_btn.Enabled := True;
           Label4.Caption := 'Ссылка исправна';
@@ -688,9 +721,7 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  //Form1.WindowState := wsMaximized;
   start_btn.Enabled := False;
-  //WebBrowser1.Navigate('https://www.olx.kz/m');
   with data_list do
   begin
     Cells[0, 0] := 'Имя / Организация';
