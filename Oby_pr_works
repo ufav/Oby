@@ -7,7 +7,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, RegExpr, IdHTTP, Vcl.StdCtrls,
   IdBaseComponent, IdAntiFreezeBase, Vcl.IdAntiFreeze, Vcl.OleCtrls, SHDocVw,
   Vcl.ComCtrls, IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL,
-  Vcl.Grids, IdURI, System.UITypes, IdSSLOpenSSLHeaders, IdCTypes;
+  Vcl.Grids, IdURI, System.UITypes, IdSSLOpenSSLHeaders;
 
 type
   TForm1 = class(TForm)
@@ -48,47 +48,21 @@ type
     { Public declarations }
   end;
 
-type
-  TCustomIdHTTP = class(TIdHTTP)
-  public
-    constructor Create(AOwner: TComponent);
-  private
-    procedure OnStatusInfoEx(ASender: TObject; const AsslSocket: PSSL; const AWhere, Aret: TIdC_INT; const AType, AMsg: String);
-  end;
-
 var
   lst2: TStringList;
   stop_flag: Boolean;
   site: Integer;
   Form1: TForm1;
+  function GetPhoneList(s: string): string;
 
 implementation
 
 {$R *.dfm}
 
-constructor TCustomIdHTTP.Create(AOwner: TComponent);
-begin
-  IOHandler := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
-  with IOHandler as TIdSSLIOHandlerSocketOpenSSL do
-    begin
-      OnStatusInfoEx := Self.OnStatusInfoEx;
-      SSLOptions.Method := sslvSSLv23;
-      SSLOptions.SSLVersions := [sslvTLSv1_2, sslvTLSv1_1, sslvTLSv1];
-    end;
-  inherited Create(AOwner);
-end;
-
-procedure TCustomIdHTTP.OnStatusInfoEx(ASender: TObject; const AsslSocket: PSSL; const AWhere, Aret: TIdC_INT;
-  const AType, AMsg: String);
-begin
-  SSL_set_tlsext_host_name(AsslSocket, Request.Host);
-end;
-
 procedure TForm1.start_btnClick(Sender: TObject);
 var
-  i: Integer;        //PageCount
+  i, j: Integer;        //PageCount
   IdHTTP: TIdHTTP;
-  MyHTTP: TCustomIdHTTP;
   IdSSL: TIdSSLIOHandlerSocketOpenSSL;
   s, st, t, ph, nm, ct, Link, pLink: string;    //Phone, Name, City
   lst1, lst3, lst4: TStringList;
@@ -106,6 +80,7 @@ begin
   lst2 := TStringList.Create; //итоговый список всех данных для выгрузки
   IdHTTP := TIdHTTP.Create;
   IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+  IdSSL.SSLOptions.Method := sslvTLSv1_2;
   IdHTTP.IOHandler := IdSSL;
   IdHTTP.HandleRedirects := True;
   IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
@@ -188,6 +163,7 @@ begin
                 ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
                 if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
                 if (Length(ph) = 11) and (Copy(ph, 1, 1) = '7') then ph := '8' + copy(ph, 2, 10);
+                if (Length(ph) = 10) and (Copy(ph, 1, 1) = '7') then ph := '8' + ph;
                 re1.Expression := '"block brkword xx-large">(.*?)</span>';    //имя
                 re1.Exec(s);
                 nm := re1.Match[1];
@@ -245,16 +221,7 @@ begin
               try
                 t := IdHTTP.Get('https://m.kolesa.kz/a/show/' + lst1.Strings[i]);
                 s := IdHTTP.Get('http://m.kolesa.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
-                re1.Expression := 'phones":{"(.*?)"}';        //Телефон
-                re1.Exec(s);
-                ph := StringReplace(re1.Match[1], '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ':', ';', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
+                ph := GetPhoneList(s);
                 ct := Copy(t, Pos('Город', t), Pos('Кузов', t) - Pos('Город', t) + 5);
                 re1.Expression := '<div>(.*?)</div>';     //Город
                 re1.Exec(ct);
@@ -264,8 +231,8 @@ begin
                   begin
                     re1.Expression := 'bl gr">(.*?)</div';
                     re1.Exec(nm);
-                    nm := StringReplace(re1.Match[1], #13#10, '', [rfReplaceAll, rfIgnoreCase]);
-                    nm := Trim(Copy(nm, 1, Pos('для', nm) - 1));
+                    nm := Trim(StringReplace(re1.Match[1], #13#10, '', [rfReplaceAll, rfIgnoreCase]));
+                    if Pos('для', nm) > 0 then nm := Trim(Copy(nm, 1, Pos('для', nm) - 1));
                   end
                 else
                   nm := 'Нет данных';
@@ -319,16 +286,7 @@ begin
               try
                 t := IdHTTP.Get('https://m.krisha.kz/a/show/' + lst1.Strings[i]);
                 s := IdHTTP.Get('http://m.krisha.kz/a/ajaxPhones/?id=' + lst1.Strings[i]);
-                re1.Expression := 'tel:(.*?)\"';        //Телефон
-                ph := '';
-                if re1.Exec(s) then
-                  repeat
-                    ph := ph + ';' + re1.Match[1];
-                  until not re1.ExecNext;
-                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, '\', '', [rfReplaceAll, rfIgnoreCase]);
-                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                ph := GetPhoneList(s);
                 re1.Expression := '"address">(.*?)</span>';        //Город
                 re1.Exec(t);
                 ct := Trim(re1.Match[1]);
@@ -360,10 +318,6 @@ begin
 
     3:    //Маркет
       begin
-        FreeAndNil(IdHTTP);
-        FreeAndNil(IdSSL);
-        MyHTTP := TCustomIdHTTP.Create(nil);
-        MyHTTP.HandleRedirects := True;
         if Pos('?', Edit3.Text) = 0 then    //определяем ссылку. Если нет вопросительного знака в ссылке, то берем ссылку, как есть
           begin
             Link := Edit3.Text;
@@ -375,11 +329,11 @@ begin
             pLink := '&' + Copy(Edit3.Text, Pos('?', Edit3.Text) + 1, Length(Edit3.Text) - Pos('?', Edit3.Text) + 1);    //и после
           end;
         lst3 := TStringList.Create; //список ID объявлений
-        MyHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
-        MyHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
+        IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
+        IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
           try
-            s := MyHTTP.Get(Link + '?page=' + IntToStr(i) + pLink);
+            s := IdHTTP.Get(Link + '?page=' + IntToStr(i) + pLink);
             re1.Expression := 'data-id="(.*?)">';    //собираем ID объявлений
             if re1.Exec(s) then
               repeat
@@ -415,20 +369,9 @@ begin
                 lst4.Add('id=' + lst3.Strings[i]);
                 lst4.Add('modal=1');
                 re1.Expression := 'phones">(.*?)<';
-                s := MyHTTP.Post('https://market.kz/ajax/load-phones/', lst4);
-                t := MyHTTP.Get('https://market.kz/a/' + lst1.Strings[i]);
-                ph := ''; //телефон
-                if re1.Exec(s) then
-                  repeat
-                    ph := ph + ';' + re1.Match[1];
-                  until not re1.ExecNext;
-                ph := StringReplace(ph, '(', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ')', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, '-', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ' ', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, '"', '', [rfReplaceAll, rfIgnoreCase]);
-                ph := StringReplace(ph, ',', ';', [rfReplaceAll, rfIgnoreCase]);
-                if Copy(ph, 1, 1) = ';' then ph := Copy(ph, 2, Length(ph) - 1);
+                s := IdHTTP.Post('https://market.kz/ajax/load-phones/', lst4);
+                t := IdHTTP.Get('https://market.kz/a/' + lst1.Strings[i]);
+                ph := GetPhoneList(s);
                 re1.Expression := '<dt>Регион</dt><dd>(.*?)</dd>';  //город
                 re1.Exec(t);
                 ct := Trim(re1.Match[1]);
@@ -453,7 +396,6 @@ begin
           end;
         FreeAndNil(lst3);
         FreeAndNil(lst4);
-        FreeAndNil(MyHTTP);
       end;
 
     4:    //Satu
@@ -637,16 +579,14 @@ end;
 procedure TForm1.Edit3Change(Sender: TObject);
 var
   IdHTTP: TIdHTTP;
-  MyHTTP: TCustomIdHTTP;
   IdSSL: TIdSSLIOHandlerSocketOpenSSL;
   s: string;
 begin
   Label4.Caption := 'Проверка ссылки';
   IdHTTP := TIdHTTP.Create;
-  MyHTTP := TCustomIdHTTP.Create(nil);
   IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+  IdSSL.SSLOptions.Method := sslvTLSv1_2;
   IdHTTP.IOHandler := IdSSL;
-  MyHTTP.HandleRedirects := True;
   IdHTTP.HandleRedirects := True;
   IdHTTP.ProtocolVersion := pv1_1;
   IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
@@ -657,13 +597,7 @@ begin
   if Length(Edit3.Text) > 0 then
     try
       //s := IdHTTP.Get(TIdURI.URLEncode(Edit3.Text));
-      if (Pos('kolesa', Edit3.Text) > 0)
-      or (Pos('krisha', Edit3.Text) > 0) then
-        s := IdHTTP.Get(StringReplace(Edit3.Text, 'https://', 'https://m.', [rfReplaceAll, rfIgnoreCase]))
-      else if Pos('market', Edit3.Text) > 0 then
-        s := MyHTTP.Get(Edit3.Text)
-      else
-        s := IdHTTP.Get(Edit3.Text);
+      s := IdHTTP.Get(Edit3.Text);
       if (pos('olx.kz', Edit3.Text) > 0)
       or (pos('kolesa.kz', Edit3.Text) > 0)
       or (pos('krisha.kz', Edit3.Text) > 0)
@@ -781,6 +715,31 @@ begin
     SetProcessWorkingSetSize(MainHandle, DWORD(-1), DWORD(-1));
     CloseHandle(MainHandle);
   end;
+end;
+
+function GetPhoneList(s: string): string;
+var
+  re1: TRegExpr;
+  lst1: TStringList;
+  i: Integer;
+begin
+  lst1 := TStringList.Create;
+  lst1.Sorted := True;
+  lst1.Duplicates := dupIgnore;
+  re1 := TRegExpr.Create;
+  s := StringReplace(s, '\u00a0', '', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, '(', '', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ')', '', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, '-', '', [rfReplaceAll, rfIgnoreCase]);
+  s := StringReplace(s, ' ', '', [rfReplaceAll, rfIgnoreCase]);
+  re1.Expression := '\+(.*?)(\\|"|<)';        //Телефон
+  if re1.Exec(s) then    //собираем ID объявлений
+    repeat
+      lst1.Add(re1.Match[1]);
+    until not re1.ExecNext;
+  lst1.Delimiter := ';';
+  lst1.QuoteChar := #0;
+  Result := lst1.DelimitedText;
 end;
 
 end.
