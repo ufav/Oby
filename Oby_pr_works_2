@@ -1,0 +1,117 @@
+unit GAK;
+
+interface
+
+uses
+  Registry, EncdDecd, IdHashMessageDigest, Winapi.Windows, System.SysUtils,
+  System.Classes;
+
+var
+  key: string;
+  function md5(s: string): string;
+  procedure GetKey;
+
+implementation
+
+uses
+  OLX5;
+
+procedure GetKey;
+var
+  Reg: TRegistry;
+  bios, proc, win, glob: TStringList;
+  i: Integer;
+  s: string;
+begin
+  glob := TStringList.Create;
+  glob.Sorted := True;
+  glob.Duplicates := dupIgnore;
+  bios := TStringList.Create;
+  bios.Add('BIOSVersion');
+  bios.Add('BIOSVendor');
+  bios.Add('BIOSReleaseDate');
+  bios.Add('SystemProductName');
+  proc := TStringList.Create;
+  proc.Add('ProcessorNameString');
+  proc.Add('Identifier');
+  proc.Add('VendorIdentifier');
+  win := TStringList.Create;
+  win.Add('ProductName');
+  win.Add('BuildGUID');
+
+  Reg := TRegistry.Create;
+  Reg.RootKey := HKEY_LOCAL_MACHINE;
+  for i := bios.Count - 1 downto 0 do
+    begin
+      if Reg.OpenKeyReadOnly('HARDWARE\DESCRIPTION\System\BIOS') then
+        begin
+          if Reg.ValueExists(bios.Strings[i]) then
+            glob.Add(Reg.ReadString(bios.Strings[i]))
+          else
+            glob.Add('N/A');
+          Reg.CloseKey;
+        end;
+    end;
+  FreeAndNil(bios);
+
+  for i := proc.Count - 1 downto 0 do
+    begin
+      if Reg.OpenKeyReadOnly('HARDWARE\DESCRIPTION\System\CentralProcessor\0') then
+        begin
+          if Reg.ValueExists(proc.Strings[i]) then
+            glob.Add(Reg.ReadString(proc.Strings[i]))
+          else
+            glob.Add('N/A');
+          Reg.CloseKey;
+        end;
+    end;
+  FreeAndNil(proc);
+  if Reg.OpenKeyReadOnly('HARDWARE\DESCRIPTION\System\CentralProcessor\0') then
+    begin
+      if Reg.ValueExists('~MHz') then
+        glob.Add(IntToStr(Reg.ReadInteger('~MHz')))
+      else
+        glob.Add('N/A');
+      Reg.CloseKey;
+    end;
+
+  for i := win.Count - 1 downto 0 do
+    begin
+      if Reg.OpenKeyReadOnly('SOFTWARE\Microsoft\Windows NT\CurrentVersion') then
+        begin
+          if Reg.ValueExists(win.Strings[i]) then
+            glob.Add(Reg.ReadString(win.Strings[i]))
+          else
+            glob.Add('N/A');
+          Reg.CloseKey;
+        end;
+    end;
+  FreeAndNil(win);
+
+  glob.Delimiter := ';';
+  glob.QuoteChar := #0;
+  s := glob.DelimitedText;                        //список некоторых параметров системы в виде строки
+  s := md5(s);                                    //шифруем в md5
+  s := EncodeString(s);                           //шифруем в Base64
+  s := md5(s);                                    //шифруем в md5
+  s := DateToStr(Date) + s;                       //добавляем текущую дату
+  s := md5(s);                                    //шифруем в md5
+  s := Copy(s, 6, Length(s) - 5) + Copy(s, 1, 5); //финальный вариант серийного номера
+  s := md5(s);                                    //шифруем в md5
+  key := Copy(s, 3, 4) + '-' + Copy(s, 27, 4) + '-' + Copy(s, 21, 4) + '-' + Copy(s, 15, 4);    //генерируем ключ
+  FreeAndNil(Reg);
+  FreeAndNil(glob);
+end;
+
+function md5(s: string): string;
+begin
+  Result := '';
+  with TIdHashMessageDigest5.Create do
+    try
+      Result := AnsiLowerCase(HashStringAsHex(s));
+    finally
+      Free;
+    end;
+end;
+
+end.
