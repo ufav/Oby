@@ -18,7 +18,7 @@ type
     ProgressBar1: TProgressBar;
     Edit2: TEdit;
     Label2: TLabel;
-    Edit3: TEdit;
+    URL: TEdit;
     Memo1: TMemo;
     Memo2: TMemo;
     Edit4: TEdit;
@@ -31,17 +31,25 @@ type
     stop_btn: TButton;
     only_phone_2gis: TRadioButton;
     all_2gis: TRadioButton;
+    activation_key: TEdit;
+    activate: TButton;
+    Label5: TLabel;
+    serial_number: TEdit;
+    Label6: TLabel;
+    Label7: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure start_btnClick(Sender: TObject);
     procedure RamClean;
     procedure SaveToFile;
-    procedure Edit3Change(Sender: TObject);
+    procedure URLChange(Sender: TObject);
     procedure clear_btnClick(Sender: TObject);
     procedure stop_btnClick(Sender: TObject);
     procedure data_listMouseWheelDown(Sender: TObject; Shift: TShiftState;
       MousePos: TPoint; var Handled: Boolean);
     procedure data_listMouseWheelUp(Sender: TObject; Shift: TShiftState;
       MousePos: TPoint; var Handled: Boolean);
+    procedure activation_keyChange(Sender: TObject);
+    procedure activateClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -57,6 +65,9 @@ var
 
 implementation
 
+uses
+  GAK;
+
 {$R *.dfm}
 
 procedure TForm1.start_btnClick(Sender: TObject);
@@ -69,7 +80,7 @@ var
   re1: TRegExpr;
   flag: Boolean;
 begin
-  Edit3.Enabled := False;
+  URL.Enabled := False;
   start_btn.Enabled := False;
   clear_btn.Enabled := False;
   stop_flag := False;
@@ -91,7 +102,7 @@ begin
   case site of
     0:    //OLX
       begin
-        Link := Edit3.Text;
+        Link := URL.Text;
         re1.Expression := '<a href="https://www.olx.kz/obyavlenie/(.*?).html';
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
@@ -188,7 +199,7 @@ begin
 
     1:    //Колёса
       begin
-        Link := StringReplace(Edit3.Text, 'https://', 'https://m.', [rfReplaceAll, rfIgnoreCase]);
+        Link := StringReplace(URL.Text, 'https://', 'https://m.', [rfReplaceAll, rfIgnoreCase]);
         if Pos('?', Link) > 0 then st := '&' else st := '?';
         re1.Expression := '<a href="/a/show/(.*?)" cla';
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
@@ -253,7 +264,7 @@ begin
 
     2:    //Крыша
       begin
-        Link := StringReplace(Edit3.Text, 'https://', 'https://m.', [rfReplaceAll, rfIgnoreCase]);
+        Link := StringReplace(URL.Text, 'https://', 'https://m.', [rfReplaceAll, rfIgnoreCase]);
         if Pos('?', Link) > 0 then st := '&' else st := '?';
         re1.Expression := 'data-id="(.*?)"';
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
@@ -318,15 +329,15 @@ begin
 
     3:    //Маркет
       begin
-        if Pos('?', Edit3.Text) = 0 then    //определяем ссылку. Если нет вопросительного знака в ссылке, то берем ссылку, как есть
+        if Pos('?', URL.Text) = 0 then    //определяем ссылку. Если нет вопросительного знака в ссылке, то берем ссылку, как есть
           begin
-            Link := Edit3.Text;
+            Link := URL.Text;
             pLink := '';
           end
         else    //в противном случае делим ссылку на 2 части
           begin
-            Link := Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1);    //до вопросительного знака
-            pLink := '&' + Copy(Edit3.Text, Pos('?', Edit3.Text) + 1, Length(Edit3.Text) - Pos('?', Edit3.Text) + 1);    //и после
+            Link := Copy(URL.Text, 1, Pos('?', URL.Text) - 1);    //до вопросительного знака
+            pLink := '&' + Copy(URL.Text, Pos('?', URL.Text) + 1, Length(URL.Text) - Pos('?', URL.Text) + 1);    //и после
           end;
         lst3 := TStringList.Create; //список ID объявлений
         IdHTTP.Request.CustomHeaders.Add('X-Requested-With: XMLHttpRequest');
@@ -400,17 +411,17 @@ begin
 
     4:    //Satu
       begin
-        if Pos('?', Edit3.Text) = 0 then    //определяем ссылку
+        if Pos('?', URL.Text) = 0 then    //определяем ссылку
           begin
-            Link := Edit3.Text;
+            Link := URL.Text;
             pLink := '';
           end
         else
           begin
-            Link := Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1);
-            pLink := '?' + Copy(Edit3.Text, Pos('?', Edit3.Text) + 1, Length(Edit3.Text) - Pos('?', Edit3.Text) + 1);
+            Link := Copy(URL.Text, 1, Pos('?', URL.Text) - 1);
+            pLink := '?' + Copy(URL.Text, Pos('?', URL.Text) + 1, Length(URL.Text) - Pos('?', URL.Text) + 1);
           end;
-        st := Copy(Edit3.Text, 1, Pos('satu.kz', Edit3.Text) - 1);
+        st := Copy(URL.Text, 1, Pos('satu.kz', URL.Text) - 1);
         re1.Expression := 'div><a href="(.*?)" data-qaid';
         IdHTTP.Request.CustomHeaders.Add('Referer: ' + Link);
         while flag do
@@ -482,10 +493,10 @@ begin
       end;
     5:    //2gis
       begin
-        {if Pos('?', Edit3.Text) > 0 then Link := TIdURI.URLEncode(Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1))
-        else Link := TIdURI.URLEncode(Edit3.Text);}
-        if Pos('?', Edit3.Text) > 0 then Link := Copy(Edit3.Text, 1, Pos('?', Edit3.Text) - 1)
-        else Link := Edit3.Text;
+        {if Pos('?', URL.Text) > 0 then Link := TIdURI.URLEncode(Copy(URL.Text, 1, Pos('?', URL.Text) - 1))
+        else Link := TIdURI.URLEncode(URL.Text);}
+        if Pos('?', URL.Text) > 0 then Link := Copy(URL.Text, 1, Pos('?', URL.Text) - 1)
+        else Link := URL.Text;
         pLink := Copy(Link, 1, Pos('search', Link) - 1);
         st := '/page/';
         re1.Expression := '/firm/(.*?)"';
@@ -563,7 +574,7 @@ begin
   FreeAndNil(IdSSL);
   FreeAndNil(lst1);
   FreeAndNil(re1);
-  Edit3.Enabled := True;
+  URL.Enabled := True;
   start_btn.Enabled := True;
   clear_btn.Enabled := True;
   ProgressBar1.Position := 0;
@@ -573,10 +584,10 @@ begin
   for i := lst2.Count - 1 downto 0 do       //удаление дубликатов из итогового списка
     if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
   Edit2.Text := IntToStr(lst2.Count); //показываем кол-во загруженных уникальных номеров
-  SaveToFile;
+  if Label7.Visible = True then SaveToFile; //если программа активирована, сохраняем в файл
 end;
 
-procedure TForm1.Edit3Change(Sender: TObject);
+procedure TForm1.URLChange(Sender: TObject);
 var
   IdHTTP: TIdHTTP;
   IdSSL: TIdSSLIOHandlerSocketOpenSSL;
@@ -593,30 +604,30 @@ begin
   IdHTTP.Request.CustomHeaders.Add('Accept: */*');
   IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
   IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
-  IdHTTP.Request.CustomHeaders.Add('Referer: ' + Edit3.Text);
-  if Length(Edit3.Text) > 0 then
+  IdHTTP.Request.CustomHeaders.Add('Referer: ' + URL.Text);
+  if Length(URL.Text) > 0 then
     try
-      //s := IdHTTP.Get(TIdURI.URLEncode(Edit3.Text));
-      s := IdHTTP.Get(Edit3.Text);
-      if (pos('olx.kz', Edit3.Text) > 0)
-      or (pos('kolesa.kz', Edit3.Text) > 0)
-      or (pos('krisha.kz', Edit3.Text) > 0)
-      or (pos('market.kz', Edit3.Text) > 0)
-      or (pos('satu.kz', Edit3.Text) > 0)
-      or (pos('2gis.kz', Edit3.Text) > 0) then
+      //s := IdHTTP.Get(TIdURI.URLEncode(URL.Text));
+      s := IdHTTP.Get(URL.Text);
+      if (pos('olx.kz', URL.Text) > 0)
+      or (pos('kolesa.kz', URL.Text) > 0)
+      or (pos('krisha.kz', URL.Text) > 0)
+      or (pos('market.kz', URL.Text) > 0)
+      or (pos('satu.kz', URL.Text) > 0)
+      or (pos('2gis.kz', URL.Text) > 0) then
         begin
           start_btn.Enabled := True;
           Label4.Caption := 'Ссылка исправна';
-          Edit3.Color := clMoneyGreen;
-          if pos('https://www.olx.kz', Edit3.Text) > 0 then
+          URL.Color := clMoneyGreen;
+          if pos('https://www.olx.kz', URL.Text) > 0 then
             site := 0
-          else if pos('https://kolesa.kz', Edit3.Text) > 0 then
+          else if pos('https://kolesa.kz', URL.Text) > 0 then
             site := 1
-          else if pos('https://krisha.kz', Edit3.Text) > 0 then
+          else if pos('https://krisha.kz', URL.Text) > 0 then
             site := 2
-          else if pos('https://market.kz', Edit3.Text) > 0 then
+          else if pos('https://market.kz', URL.Text) > 0 then
             site := 3
-          else if pos('https://2gis.kz', Edit3.Text) > 0 then
+          else if pos('https://2gis.kz', URL.Text) > 0 then
             begin
               site := 5;
               all_2gis.Visible := True;
@@ -626,13 +637,13 @@ begin
     except
       start_btn.Enabled := False;
       Label4.Caption := 'Неверная ссылка';
-      Edit3.Color := clFuchsia;
+      URL.Color := clFuchsia;
     end
-  else if Edit3.Text = '' then
+  else if URL.Text = '' then
     begin
       start_btn.Enabled := False;
       Label4.Caption := '';
-      Edit3.Color := clWindow;
+      URL.Color := clWindow;
     end;
   FreeAndNil(IdHTTP);
   FreeAndNil(IdSSL);
@@ -654,7 +665,28 @@ begin
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
+var
+  s: string;
+  f: textfile;
 begin
+  GetKey;
+  try
+    AssignFile(f, 'Key.txt');
+    Reset(f);
+    Readln(f, s);
+    CloseFile(f);
+  except
+    s := '';
+  end;
+  if key = s then
+    begin
+      Label7.Visible := True;
+      Label5.Visible := False;
+      Label6.Visible := False;
+      serial_number.Visible := False;
+      activation_key.Visible := False;
+      activate.Visible := False;
+    end;
   start_btn.Enabled := False;
   with data_list do
   begin
@@ -664,13 +696,43 @@ begin
   end;
 end;
 
+procedure TForm1.activateClick(Sender: TObject);
+var
+  lst1: TStringList;
+begin
+  lst1 := TStringList.Create;
+  GetKey;
+  if activation_key.Text = key then
+    begin
+      Label7.Visible := True;
+      Label5.Visible := False;
+      Label6.Visible := False;
+      serial_number.Visible := False;
+      activation_key.Visible := False;
+      activate.Visible := False;
+      lst1.Text := activation_key.Text;
+      lst1.SaveToFile('Key.txt');
+      ShowMessage('Программа активирована');
+    end
+  else
+    begin
+      ShowMessage('Неверный ключ');
+      Label7.Visible := False;
+    end;
+end;
+
+procedure TForm1.activation_keyChange(Sender: TObject);
+begin
+  if Length(activation_key.Text) > 0 then activate.Enabled := True else activate.Enabled := False;
+end;
+
 procedure TForm1.clear_btnClick(Sender: TObject);
 var
   i: Integer;
 begin
   Edit1.Text := '0';
   Edit2.Text := '0';
-  Edit3.Clear;
+  URL.Clear;
   stop_btn.Visible := False;
   ProgressBar1.Visible := False;
   ProgressBar1.Position := 0;
@@ -679,7 +741,7 @@ begin
   with data_list do
     for i := FixedRows to RowCount - 1 do
       Rows[i].Clear;
-  Edit3.SetFocus;
+  URL.SetFocus;
 end;
 
 procedure TForm1.stop_btnClick(Sender: TObject);
