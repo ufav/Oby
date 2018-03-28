@@ -13,3 +13,6 @@ begin
     Assert(group.Value = 'home');
   end;
 end;
+
+
+(@|ck\\">|ue":")(.*?)(\\|"|<)
