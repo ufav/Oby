@@ -1,0 +1,15 @@
+const
+  cRegEx = '<div (id="(?<id>[a-zA-Z0-9]+)"|name="(?<name>[a-zA-Z0-9]+)")';
+  cHtml = '<h1>bla bla bla</h1> <div id="home">';
+var
+  group: TGroup;
+  match: TMatch;
+  regEx: TRegEx;
+begin
+  regEx := TRegEx.Create(cRegEx, [roIgnoreCase,roMultiline]);
+  match := regEx.Match(cHtml);
+  if match.Success then begin
+    group := match.Groups['id'];
+    Assert(group.Value = 'home');
+  end;
+end;
