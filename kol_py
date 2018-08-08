@@ -1,0 +1,27 @@
+import requests
+import re
+
+url = 'https://m.kolesa.kz/cars/toyota/matrix/?auto-emergency=1&sort_by=price-asc&year[from]=2004'
+flag = true;
+i = 1
+lst1 = []
+
+while flag is true:
+	try:
+		s = requests.get(url + '&page=' + str(i))
+		lst1.extend(re.findall(r'advert-(.*?)\">', s.content))
+		i += 1
+		if s.find('noteBody_') == -1:
+			flag = false
+	except Exception:
+		i += 1
+		continue
+lst1 = list(set(lst1))
+
+for i in lst1:
+	try:
+		t = requests.get('https://m.kolesa.kz/a/show/' + str(i))
+		s = requests.get('http://m.kolesa.kz/a/ajaxPhones/?id=' + str(i))
+		u = requests.get('https://m.kolesa.kz/a/comments/' + str(i))
+	except Exception:
+		continue
