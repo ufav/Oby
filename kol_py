@@ -23,7 +23,7 @@ lst1 = list(set(lst1))
 for i in lst1:
     try:
         s = requests.get('http://kolesa.kz/a/ajaxPhones/?id=' + i, headers=hdr)
-        lst2.extend(re.findall(r'\+(.*?)(\\|\"|<)', s.text))
+        lst2.extend(re.findall(r'\+(.*?)[\"|\\|<|\,]', s.text))
     except Exception:
         continue
 print(lst2)
