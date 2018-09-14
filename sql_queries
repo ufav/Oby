@@ -1,0 +1,250 @@
+Option Compare Database
+
+Private Sub data_select()
+
+'basic criteria
+basic_crit = "(Comment = 'Completed' OR Comment = 'Retired')                                   AND " & _
+             "IIF(Forms!Form1!surface IS NULL, True, ATP.Surface = Forms!Form1!surface)        AND " & _
+             "IIF(Forms!Form1!series  IS NULL, True, ATP.Series = Forms!Form1!series)          AND " & _
+             "IIF(Forms!Form1!season  IS NULL, True, year(ATP.Matchdate) = Forms!Form1!season) AND " & _
+             "IIF(Forms!Form1!bestof  IS NULL, True, ATP.[Best of] = Forms!Form1!bestof)"
+
+'matches won
+mw = DCount("*", "ATP", "Winner = " & Chr$(34) & players_list_1 & Chr$(34) & "                                                                AND " & _
+                        "IIF(Forms!Form1!rank IS NULL, True, IIF(Forms!Form1!rank = 'Low', (ATP.WRank > ATP.LRank), (ATP.WRank < ATP.LRank))) AND " & _
+                        "IIF(Forms!Form1!odd  IS NULL, True, IIF(Forms!Form1!odd = 'UD',   (ATP.AvgW > ATP.AvgL),   (ATP.AvgW < ATP.AvgL)))   AND " & _
+                        basic_crit)
+
+'matches lost
+ml = DCount("*", "ATP", "Loser = " & Chr$(34) & players_list_1 & Chr$(34) & "                                                                 AND " & _
+                        "IIF(Forms!Form1!rank IS NULL, True, IIF(Forms!Form1!rank = 'Low', (ATP.WRank < ATP.LRank), (ATP.WRank > ATP.LRank))) AND " & _
+                        "IIF(Forms!Form1!odd  IS NULL, True, IIF(Forms!Form1!odd = 'UD',   (ATP.AvgW < ATP.AvgL),   (ATP.AvgW > ATP.AvgL)))   AND " & _
+                        basic_crit)
+
+'all matches
+ms = mw + ml
+
+If mw = 0 Then mw_p = 0 Else mw_p = mw / ms
+If ml = 0 Then ml_p = 0 Else ml_p = ml / ms
+
+'take one set loosing matches
+t1sl = DCount("*", "ATP", "Loser = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                          "Lsets > 0                                            AND " & _
+                          basic_crit)
+
+'all take one set matches
+t1ss = t1sl + mw
+
+If t1sl = 0 Then t1sl_p = 0 Else t1sl_p = t1sl / ml
+If t1ss = 0 Then t1ss_p = 0 Else t1ss_p = t1ss / ms
+
+'give one set winning matches
+g1sw = DCount("*", "ATP", "Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                          "Lsets > 0                                             AND " & _
+                          basic_crit)
+
+'all give one set matches
+g1ss = g1sw + ml
+
+If g1sw = 0 Then g1sw_p = 0 Else g1sw_p = g1sw / mw
+If g1ss = 0 Then g1ss_p = 0 Else g1ss_p = g1ss / ms
+
+'won first set matches
+w1sw = DCount("*", "ATP", "Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                          "W1 > L1                                               AND " & _
+                          basic_crit)
+
+w1sl = DCount("*", "ATP", "Loser = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                          "W1 < L1                                              AND " & _
+                          basic_crit)
+
+w1ss = w1sw + w1sl
+
+If w1ss = 0 Then w1ss_p = 0 Else w1ss_p = w1ss / ms
+If w1sw = 0 Then w1sw_p = 0 Else w1sw_p = w1sw / w1ss
+If w1sl = 0 Then w1sl_p = 0 Else w1sl_p = w1sl / w1ss
+
+'lost first set matches
+l1sw = DCount("*", "ATP", "Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                          "W1 < L1                                               AND " & _
+                          basic_crit)
+
+l1sl = DCount("*", "ATP", "Loser = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                          "W1 > L1                                              AND " & _
+                          basic_crit)
+
+l1ss = l1sw + l1sl
+
+If l1ss = 0 Then l1ss_p = 0 Else l1ss_p = l1ss / ms
+If l1sw = 0 Then l1sw_p = 0 Else l1sw_p = l1sw / l1ss
+If l1sl = 0 Then l1sl_p = 0 Else l1sl_p = l1sl / l1ss
+
+pvp.RowSource = "SELECT ATP.Êîä, ATP.Matchdate, ATP.Winner, ATP.Wsets, ATP.Lsets, ATP.Loser " & _
+                    "FROM ATP " & _
+                    "WHERE (ATP.Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " OR ATP.Loser = " & Chr$(34) & players_list_1 & Chr$(34) & ") AND " & _
+                          "(ATP.Winner = " & Chr$(34) & players_list_2 & Chr$(34) & " OR ATP.Loser = " & Chr$(34) & players_list_2 & Chr$(34) & ") " & _
+                    "ORDER BY ATP.Matchdate "
+
+'match total more or less
+CRIT1 = "tips.tips AND 100 "
+CRIT2 = "0 AND tips.tips "
+
+Select Case tips
+    Case 1
+        Forms!Form1.Controls!Form3.Form.RecordSource = "SELECT TOP 1 tips.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(ATP.Winner) / " & ms & ", '0%') AS percent_matches " & _
+                                                            "FROM ATP " & _
+                                                            "INNER JOIN tips ON (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5 + ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) BETWEEN " & CRIT1 & _
+                                                            "WHERE (ATP.Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " OR ATP.Loser = " & Chr$(34) & players_list_1 & Chr$(34) & ") AND " & _
+                                                                    basic_crit & _
+                                                            "GROUP BY tips.tips " & _
+                                                            "HAVING COUNT(*) = " & ms & " " & _
+                                                            "ORDER BY tips.tips DESC " & _
+                                                       "UNION SELECT tips.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(ATP.Winner) / " & ms & ", '0%') AS percent_matches " & _
+                                                            "FROM ATP " & _
+                                                            "INNER JOIN tips ON (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5 + ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) BETWEEN " & CRIT1 & _
+                                                            "WHERE (ATP.Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " OR ATP.Loser = " & Chr$(34) & players_list_1 & Chr$(34) & ") AND " & _
+                                                                    basic_crit & _
+                                                            "GROUP BY tips.tips " & _
+                                                            "HAVING COUNT(*) <> " & ms
+
+    Case 2
+        Forms!Form1.Controls!Form3.Form.RecordSource = "SELECT tips.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(ATP.Winner) / " & ms & ", '0%') AS percent_matches " & _
+                                                            "FROM ATP " & _
+                                                            "INNER JOIN tips ON (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5 + ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) BETWEEN " & CRIT2 & _
+                                                            "WHERE (ATP.Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " OR ATP.Loser = " & Chr$(34) & players_list_1 & Chr$(34) & ") AND " & _
+                                                                    basic_crit & _
+                                                            "GROUP BY tips.tips " & _
+                                                            "HAVING COUNT(*) <> " & ms & " " & _
+                                                       "UNION SELECT TOP 1 tips.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(ATP.Winner) / " & ms & ", '0%') AS percent_matches " & _
+                                                            "FROM ATP " & _
+                                                            "INNER JOIN tips ON (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5 + ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) BETWEEN " & CRIT2 & _
+                                                            "WHERE (ATP.Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " OR ATP.Loser = " & Chr$(34) & players_list_1 & Chr$(34) & ") AND " & _
+                                                                    basic_crit & _
+                                                            "GROUP BY tips.tips " & _
+                                                            "HAVING COUNT(*) = " & ms & " " & _
+                                                            "ORDER BY tip_great ASC "
+
+End Select
+
+'Forms!Form1.Controls!Form4.Form.RecordSource = "SELECT tips_fora.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(*) / " & mw & ", '0%') AS percent_matches " & _
+'                                                   "FROM ATP " & _
+'                                                   "INNER JOIN tips_fora ON (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5) - (ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) > - tips_fora.tips " & _
+'                                                   "WHERE (ATP.Winner = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND " & _
+'                                                    "(Comment = 'Completed' OR Comment = 'Retired') AND " & _
+'                                                    "IIF(Forms!Form1!surface IS NULL, True, ATP.Surface = Forms!Form1!surface) AND " & _
+'                                                    "IIF(Forms!Form1!bestof IS NULL, True, ATP.[Best of] = Forms!Form1!bestof) AND " & _
+'                                                    "IIF(Forms!Form1!series IS NULL, True, ATP.Series = Forms!Form1!series) AND " & _
+'                                                    "IIF(Forms!Form1!season IS NULL, True, year(ATP.Matchdate) = Forms!Form1!season) " & _
+'                                                   "GROUP BY tips_fora.tips " & _
+'                                                   "HAVING COUNT(*) <> " & mw & _
+'                                                   " " &
+
+'fora
+'Select Case tips_fora
+'    Case 1
+        Forms!Form1.Controls!Form4.Form.RecordSource = "SELECT tips_fora.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(*) / " & ms & ", '0%') AS percent_matches " & _
+                                                            "FROM ATP INNER JOIN tips_fora ON (ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) - (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5) < tips_fora.tips " & _
+                                                            "WHERE ATP.Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                                                                basic_crit & _
+                                                            "GROUP BY tips_fora.tips HAVING COUNT(*) <> " & mw & " " & _
+                                                       "UNION SELECT TOP 1 tips_fora.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(*) / " & ms & ", '0%') AS percent_matches " & _
+                                                            "FROM ATP INNER JOIN tips_fora ON (ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) - (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5) < tips_fora.tips " & _
+                                                            "WHERE ATP.Winner = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                                                                basic_crit & _
+                                                            "GROUP BY tips_fora.tips HAVING COUNT(*) = " & mw & " " & _
+                                                            "ORDER BY tip_great ASC "
+                                                       '"UNION SELECT tips_fora.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(*) / " & ms & ", '0%') AS percent_matches " & _
+                                                       '     "FROM ATP INNER JOIN tips_fora ON (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5) - (ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) < tips_fora.tips " & _
+                                                       '     "WHERE ATP.Loser = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                                                       '         basic_crit & _
+                                                       '     "GROUP BY tips_fora.tips HAVING COUNT(*) <> " & ms & " " & _
+                                                       '"UNION SELECT TOP 1 tips_fora.tips AS tip_great, COUNT(*) AS count_matches, FORMAT(COUNT(*) / " & ms & ", '0%') AS percent_matches " & _
+                                                       '     "FROM ATP INNER JOIN tips_fora ON (ATP.w1 + ATP.w2 + ATP.w3 + ATP.w4 + ATP.w5) - (ATP.l1 + ATP.l2 + ATP.l3 + ATP.l4 + ATP.l5) < tips_fora.tips " & _
+                                                       '     "WHERE ATP.Loser = " & Chr$(34) & players_list_1 & Chr$(34) & " AND " & _
+                                                       '         basic_crit & _
+                                                       '     "GROUP BY tips_fora.tips HAVING COUNT(*) = " & ms & " " & _
+                                                       '     "ORDER BY tip_great ASC "
+
+End Sub
+
+Private Sub bestof_AfterUpdate()
+Call data_select
+End Sub
+
+Private Sub Form_Load()
+    Forms![Form1].Controls![Form3].Form.RecordSource = ""
+    Forms![Form1].Controls![Form4].Form.RecordSource = ""
+End Sub
+
+Private Sub odd_AfterUpdate()
+Call data_select
+End Sub
+
+Private Sub players_list_1_AfterUpdate()
+Call data_select
+End Sub
+
+Private Sub players_list_2_AfterUpdate()
+Call data_select
+End Sub
+
+Private Sub rank_AfterUpdate()
+Call data_select
+End Sub
+
+Private Sub surface_AfterUpdate()
+Call data_select
+End Sub
+
+Private Sub series_AfterUpdate()
+Call data_select
+End Sub
+
+Private Sub season_AfterUpdate()
+Call data_select
+End Sub
+
+Private Sub tips_AfterUpdate()
+Call data_select
+End Sub
+
+
+
+
+
+
+
+
+
+'fw = DCount("*", "ATP", "((Winner = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND ((Comment = 'Completed') OR (Comment = 'Retired')) AND (ATP.AvgW < ATP.AvgL) AND IIF([Forms]![Form1]![surface] IS NULL, True, ATP.Surface=[Forms]![Form1]![surface]) AND IIF([Forms]![Form1]![series] IS NULL, True, ATP.Series=[Forms]![Form1]![series]) AND IIF([Forms]![Form1]![season] IS NULL, True, year(ATP.Matchdate)=[Forms]![Form1]![season]))")
+'fl = DCount("*", "ATP", "((Loser = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND ((Comment = 'Completed') OR (Comment = 'Retired')) AND (ATP.AvgW > ATP.AvgL) AND IIF([Forms]![Form1]![surface] IS NULL, True, ATP.Surface=[Forms]![Form1]![surface]) AND IIF([Forms]![Form1]![series] IS NULL, True, ATP.Series=[Forms]![Form1]![series]) AND IIF([Forms]![Form1]![season] IS NULL, True, year(ATP.Matchdate)=[Forms]![Form1]![season]))")
+'fs = fw + fl
+
+'If fw = 0 Then fw_p = 0 Else fw_p = fw / fs
+'If fl = 0 Then fl_p = 0 Else fl_p = fl / fs
+'If fs = 0 Then fs_p = 0 Else fs_p = fs / ms
+
+'ow = DCount("*", "ATP", "((Winner = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND ((Comment = 'Completed') OR (Comment = 'Retired')) AND (ATP.AvgW > ATP.AvgL) AND IIF([Forms]![Form1]![surface] IS NULL, True, ATP.Surface=[Forms]![Form1]![surface]) AND IIF([Forms]![Form1]![series] IS NULL, True, ATP.Series=[Forms]![Form1]![series]) AND IIF([Forms]![Form1]![season] IS NULL, True, year(ATP.Matchdate)=[Forms]![Form1]![season]))")
+'ol = DCount("*", "ATP", "((Loser = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND ((Comment = 'Completed') OR (Comment = 'Retired')) AND (ATP.AvgW < ATP.AvgL) AND IIF([Forms]![Form1]![surface] IS NULL, True, ATP.Surface=[Forms]![Form1]![surface]) AND IIF([Forms]![Form1]![series] IS NULL, True, ATP.Series=[Forms]![Form1]![series]) AND IIF([Forms]![Form1]![season] IS NULL, True, year(ATP.Matchdate)=[Forms]![Form1]![season]))")
+'os = ow + ol
+
+'If ow = 0 Then ow_p = 0 Else ow_p = ow / os
+'If ol = 0 Then ol_p = 0 Else ol_p = ol / os
+'If os = 0 Then os_p = 0 Else os_p = os / ms
+
+'hrw = DCount("*", "ATP", "((Winner = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND ((Comment = 'Completed') OR (Comment = 'Retired')) AND (ATP.WRank < ATP.LRank) AND IIF([Forms]![Form1]![surface] IS NULL, True, ATP.Surface=[Forms]![Form1]![surface]) AND IIF([Forms]![Form1]![series] IS NULL, True, ATP.Series=[Forms]![Form1]![series]) AND IIF([Forms]![Form1]![season] IS NULL, True, year(ATP.Matchdate)=[Forms]![Form1]![season]))")
+'hrl = DCount("*", "ATP", "((Loser = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND ((Comment = 'Completed') OR (Comment = 'Retired')) AND (ATP.WRank > ATP.LRank) AND IIF([Forms]![Form1]![surface] IS NULL, True, ATP.Surface=[Forms]![Form1]![surface]) AND IIF([Forms]![Form1]![series] IS NULL, True, ATP.Series=[Forms]![Form1]![series]) AND IIF([Forms]![Form1]![season] IS NULL, True, year(ATP.Matchdate)=[Forms]![Form1]![season]))")
+'hrs = hrw + hrl
+
+'If hrw = 0 Then hrw_p = 0 Else hrw_p = hrw / hrs
+'If hrl = 0 Then hrl_p = 0 Else hrl_p = hrl / hrs
+'If hrs = 0 Then hrs_p = 0 Else hrs_p = hrs / ms
+
+'lrw = DCount("*", "ATP", "((Winner = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND ((Comment = 'Completed') OR (Comment = 'Retired')) AND (ATP.WRank > ATP.LRank) AND IIF([Forms]![Form1]![surface] IS NULL, True, ATP.Surface=[Forms]![Form1]![surface]) AND IIF([Forms]![Form1]![series] IS NULL, True, ATP.Series=[Forms]![Form1]![series]) AND IIF([Forms]![Form1]![season] IS NULL, True, year(ATP.Matchdate)=[Forms]![Form1]![season]))")
+'lrl = DCount("*", "ATP", "((Loser = " & Chr$(34) & Me.players_list_1.Value & Chr$(34) & ") AND ((Comment = 'Completed') OR (Comment = 'Retired')) AND (ATP.WRank < ATP.LRank) AND IIF([Forms]![Form1]![surface] IS NULL, True, ATP.Surface=[Forms]![Form1]![surface]) AND IIF([Forms]![Form1]![series] IS NULL, True, ATP.Series=[Forms]![Form1]![series]) AND IIF([Forms]![Form1]![season] IS NULL, True, year(ATP.Matchdate)=[Forms]![Form1]![season]))")
+'lrs = lrw + lrl
+
+'If lrw = 0 Then lrw_p = 0 Else lrw_p = lrw / lrs
+'If lrl = 0 Then lrl_p = 0 Else lrl_p = lrl / lrs
+'If lrs = 0 Then lrs_p = 0 Else lrs_p = lrs / ms
+
