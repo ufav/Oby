@@ -1,0 +1,118 @@
+unit Unit1;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, IdHTTP, RegExpr, Vcl.StdCtrls,
+  IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL,
+  IdSSLOpenSSLHeaders;
+
+type
+  TForm1 = class(TForm)
+    Button1: TButton;
+    Button2: TButton;
+    Memo1: TMemo;
+    Memo2: TMemo;
+    Memo3: TMemo;
+    Memo4: TMemo;
+    procedure FormCreate(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+
+{$R *.dfm}
+
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  i, j, k: Integer;
+  IdHTTP: TIdHTTP;
+  //IdSSL: TIdSSLIOHandlerSocketOpenSSL;
+  s, t, u: string;
+  lst1, lst2, lst3: TStringList;
+  re1, re2, re3: TRegExpr;
+  flag: Boolean;
+begin
+  IdHTTP := TIdHTTP.Create;
+  re1 := TRegExpr.Create;
+  lst1 := TStringList.Create;
+  lst2 := TStringList.Create;
+  s := IdHTTP.Get('http://boxrec.com/en/results?&offset=0');
+
+  re1.Expression := '\(''sa(.*?)''\)';
+  if re1.Exec(s) then
+    repeat
+      lst1.Add(re1.Match[1]);
+    until not re1.ExecNext;
+  Memo1.Text := lst1.Text;
+  Memo1.Lines.Add('footerAd');
+  lst1.Clear;
+
+  re1.Expression := '-\d{2}">(.*?)</a>';
+  if re1.Exec(s) then
+    repeat
+      lst1.Add(re1.Match[1]);
+    until not re1.ExecNext;
+  Memo2.Text := lst1.Text;
+  lst1.Clear;
+
+  for i := 0 to Memo1.Lines.Count - 1 do
+    begin
+      t := Copy(s, Pos(Memo1.Lines[i], s), Pos(Memo1.Lines[i + 1], s) - Pos(Memo1.Lines[i], s) + 5);
+      re1.Expression := 'id="ma(.*?)"';
+      if re1.Exec(t) then
+        repeat
+          lst1.Add(re1.Match[1]);
+        until not re1.ExecNext;
+      lst2.Add(lst1.Text);
+      //Memo3.Lines.Add(lst1.Text);
+      lst1.Clear;
+    end;
+  for i := lst2.Count - 1 downto 0 do       //удаление дубликатов
+    if lst2.IndexOf(lst2.Strings[i]) < i then lst2.Delete(i);
+  Memo3.Text := lst2.Text;
+
+
+end;
+
+procedure TForm1.Button2Click(Sender: TObject);
+var
+  IdHTTP: TIdHTTP;
+  IdSSL: TIdSSLIOHandlerSocketOpenSSL;
+  lp: TStringList;
+
+begin
+  IdHTTP := TIdHTTP.Create;
+  IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+  IdSSL.SSLOptions.Method := sslvTLSv1_2;
+  IdHTTP.IOHandler := IdSSL;
+  IdHTTP.HandleRedirects := True;
+  IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+  IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+  IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+  IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
+  lp := TStringList.Create;
+  lp.Add('_username=khvostatyy');
+  lp.Add('_password=Ghbrjk123');
+  try
+    IdHTTP.Post('http://boxrec.com/en/login', lp);
+  except
+    ShowMessage('Ошибка соединения');
+  end;
+end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  Form1.WindowState := wsMaximized;
+end;
+
+end.
