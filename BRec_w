@@ -1,0 +1,142 @@
+unit Unit1;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, idhttp, Vcl.StdCtrls, Vcl.Grids, RegExpr,
+  IdIOHandler, IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL, IdSSLOpenSSLHeaders;
+
+type
+  TForm1 = class(TForm)
+    Button1: TButton;
+    Memo1: TMemo;
+    data_list: TStringGrid;
+    Button2: TButton;
+    procedure Button1Click(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form1: TForm1;
+
+implementation
+
+{$R *.dfm}
+
+procedure TForm1.Button1Click(Sender: TObject);
+var
+  IdHTTP: TIdHTTP;
+  s, t: string;
+  i, j, k: integer;
+  re1: TRegExpr;
+  lst1, lst2, lst3, lp: TStringList;
+begin
+  idhttp := tidhttp.Create;
+  //lp := tstringlist.Create;
+  //lp.Add('_username=khvostatyy');
+  //lp.Add('_password=Ghbrjk123');
+  //IdHTTP.Post('http://boxrec.com/en/login', lp);
+  s := idhttp.Get('http://boxrec.com/en/results?&offset=0');
+  s := copy(s, pos('calendarTable', s), Pos('footerAd', s) - Pos('calendarTable', s));
+  re1 := TRegExpr.Create;
+  lst1 := TStringList.Create;
+  lst2 := TStringList.Create;
+  lst3 := TStringList.Create;
+  re1.Expression := '-\d{2}">(.*?)</a>';
+  if re1.Exec(s) then
+    repeat
+      lst1.Add(re1.Match[1]);
+    until not re1.ExecNext;
+  for i := lst1.Count - 1 downto 0 do
+    data_list.Cells[0, lst1.Count - i] := lst1.Strings[i];
+  lst1.Clear;
+
+  re1.Expression := 'getElementById\(''sa(.*?)''\)\)';
+  if re1.Exec(s) then
+    repeat
+      lst1.Add(re1.Match[1]);
+    until not re1.ExecNext;
+  for i := 0 to lst1.Count - 1 do
+    data_list.Cells[1, i + 1] := lst1.Strings[i];
+  //lst1.Clear;
+
+
+  j := 0;
+  for i := 0 to lst1.Count - 2 do
+    begin
+      t := copy(s, pos(lst1.Strings[i], s), Pos(lst1.Strings[i + 1], s) - Pos(lst1.Strings[i], s));
+      re1.Expression := 'id="ma(.*?)"';
+      if re1.Exec(t) then
+        repeat
+          begin
+            lst2.Add(re1.Match[1]);
+            data_list.Cells[2, j + 1] := re1.Match[1];
+            j := j + 1;
+          end;
+        until not re1.ExecNext;
+      memo1.Text := lst2.Text;
+    end;
+
+  k := 1;
+  j := 0;
+  for i := 0 to lst1.Count - 2 do
+    begin
+      t := copy(s, pos(lst1.Strings[i], s), Pos(lst1.Strings[i + 1], s) - Pos(lst1.Strings[i], s));
+      re1.Expression := 'personLink">(.*?)</a>';
+      if re1.Exec(t) then
+        repeat
+          begin
+            lst3.Add(re1.Match[1]);
+            //data_list.Cells[3, j + 1] := lst3.Strings[k * 2 - 2];
+            //j := j + 1;
+            //k := k + 1;
+          end;
+        until not re1.ExecNext;
+      //data_list.Cells[3, j + 1] := lst3.Strings[k * 2 - 2];
+      //j := j + 1;
+      //k := k + 1;
+      memo1.Text := lst3.Text;
+    end;
+
+  for i := 0 to lst2.Count - 1 do
+    begin
+      data_list.Cells[3, i + 1] := lst3.Strings[k * 2 - 2];
+      k := k + 1;
+    end;
+
+end;
+
+procedure TForm1.Button2Click(Sender: TObject);
+var
+  IdHTTP: TIdHTTP;
+  IdSSL: TIdSSLIOHandlerSocketOpenSSL;
+  lp: TStringList;
+begin
+  idhttp := tidhttp.Create;
+  IdSSL := TIdSSLIOHandlerSocketOpenSSL.Create;
+  IdSSL.SSLOptions.Method := sslvTLSv1_2;
+  IdHTTP.IOHandler := IdSSL;
+  IdHTTP.HandleRedirects := True;
+  IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+  IdHTTP.Request.CustomHeaders.Add('Accept: */*');
+  IdHTTP.Request.CustomHeaders.Add('Accept-Encoding:gzip, deflate, sdch, br');
+  IdHTTP.Request.CustomHeaders.Add('Accept-Language:ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4');
+  lp := tstringlist.Create;
+  lp.Add('_username=khvostatyy');
+  lp.Add('_password=Ghbrjk123');
+  IdHTTP.Post('http://boxrec.com/en/login/', lp);
+
+end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  form1.WindowState := wsmaximized;
+end;
+
+end.
