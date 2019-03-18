@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.525,C:\Users\Admin\Documents\Embarcadero\Studio\Projects\Unit1.pas=C:\Users\Admin\Documents\Embarcadero\Studio\Projects\BoxRec_re\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.775,=D:\DelphiXE8\Embarcadero\Studio\16.0\lib\regexpr_RU\Source\RegExpr.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.525,C:\Users\Admin\Documents\Embarcadero\Studio\Projects\Unit1.dfm=C:\Users\Admin\Documents\Embarcadero\Studio\Projects\BoxRec_re\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.304,=C:\Users\Admin\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.715,C:\Users\Admin\Documents\Embarcadero\Studio\Projects\Project3.dproj=C:\Users\Admin\Documents\Embarcadero\Studio\Projects\BoxRec_re\Project1.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.780,=C:\Users\Admin\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.922,=C:\Users\Admin\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+  </Transactions>
+</BorlandProject>
