@@ -92,7 +92,7 @@ begin
   lst1 := TStringList.Create;
   lst2 := TStringList.Create;
 
-  s := IdHTTP.Get('http://boxrec.com/en/event/772920/2296464'); //fighters block
+  s := IdHTTP.Get('http://boxrec.com/en/event/783549/2327203'); //fighters block
   t := Copy(s, Pos('pageHeading', s), Pos('starBase', s) - Pos('pageHeading', s));
 
   re1.Expression := 'Link">(.*?)</a>';  //fighters
@@ -114,6 +114,14 @@ begin
       re1.Expression := 'Link">(.*?)</a>';
       re1.Exec(t);
       data_list.Cells[3, 1] := re1.Match[1];
+      t := Copy(s, Pos('/referee/', s) - 150, 300);
+      re1.Expression := 'right;font-size:0.8em;" width="40%">(.*?)</td>';
+      re1.Exec(t);
+      data_list.Cells[4, 1] := re1.Match[1];
+      re1.Expression := 'left;font-size:0.8em;"  width="40%">(.*?)</td>';
+      re1.Exec(t);
+      data_list.Cells[5, 1] := re1.Match[1];
+
     end;
 
   if Pos('/judge/', s) > 0 then //judges*
@@ -128,9 +136,9 @@ begin
         repeat
           lst2.Add(re1.Match[1]);
         until not re1.ExecNext;
-      data_list.Cells[4, 1] := lst2.strings[0];
-      data_list.Cells[5, 1] := lst2.Strings[1];
-      data_list.Cells[6, 1] := lst2.Strings[2];
+      data_list.Cells[6, 1] := lst2.strings[0];
+      data_list.Cells[7, 1] := lst2.Strings[1];
+      data_list.Cells[8, 1] := lst2.Strings[2];
       lst1.Clear;
       lst2.Clear;
 
@@ -140,25 +148,23 @@ begin
         repeat
           lst1.Add(re1.Match[1]);
         until not re1.ExecNext;
-      data_list.Cells[7, 1] := lst1.strings[0];
-      data_list.Cells[8, 1] := lst1.Strings[1];
-      data_list.Cells[9, 1] := lst1.Strings[2];
-      data_list.Cells[10, 1] := lst1.Strings[3];
-      data_list.Cells[11, 1] := lst1.Strings[4];
-      data_list.Cells[12, 1] := lst1.Strings[5];
+      data_list.Cells[9, 1] := lst1.strings[0];
+      data_list.Cells[10, 1] := lst1.Strings[1];
+      data_list.Cells[11, 1] := lst1.Strings[2];
+      data_list.Cells[12, 1] := lst1.Strings[3];
+      data_list.Cells[13, 1] := lst1.Strings[4];
+      data_list.Cells[14, 1] := lst1.Strings[5];
       lst1.Clear;
     end;
 
   t := Copy(s, Pos('<br><span class="textWon">', s), 200);  //text won
   re1.Expression := 'Won">(.*?)</span>';
   re1.Exec(t);
-  data_list.Cells[13, 1] := re1.Match[1];
+  data_list.Cells[15, 1] := re1.Match[1];
 
   re1.Expression := '\s<br>(.*?)\n';  //round won
   re1.Exec(t);
-  data_list.Cells[14, 1] := re1.Match[1];
-
-  Memo1.Text := t;
+  data_list.Cells[16, 1] := re1.Match[1];
 
   t := Copy(s, Pos('ranking', s), Pos('details', s) - Pos('ranking', s)); //ranking
   t := StringReplace(t, 'points', '', [rfReplaceAll, rfIgnoreCase]);
@@ -167,9 +173,9 @@ begin
     repeat
       lst1.Add(re1.Match[1]);
     until not re1.ExecNext;
-  data_list.Cells[15, 1] := lst1.strings[0];  //ranking
-  data_list.Cells[16, 1] := lst1.Strings[1];  //points before fight
-  data_list.Cells[17, 1] := lst1.Strings[2];  //points after fight
+  data_list.Cells[17, 1] := lst1.strings[0];  //ranking
+  data_list.Cells[18, 1] := lst1.Strings[1];  //points before fight
+  data_list.Cells[19, 1] := lst1.Strings[2];  //points after fight
   lst1.Clear;
 
   re1.Expression := 'left;">(.*?)</td>';  //2nd fighter
@@ -177,10 +183,101 @@ begin
     repeat
       lst1.Add(re1.Match[1]);
     until not re1.ExecNext;
-  data_list.Cells[18, 1] := lst1.strings[0];  //ranking
-  data_list.Cells[19, 1] := lst1.Strings[1];  //points before fight
-  data_list.Cells[20, 1] := lst1.Strings[2];  //points after fight
+  data_list.Cells[20, 1] := lst1.strings[0];  //ranking
+  data_list.Cells[21, 1] := lst1.Strings[1];  //points before fight
+  data_list.Cells[22, 1] := lst1.Strings[2];  //points after fight
   lst1.Clear;
+
+  if Pos('<b>age</b>', s) > 0 then  //age
+    begin
+      t := Copy(s, Pos('<b>age</b>', s) - 75, 150);
+      re1.Expression := 'right;">(.*?)</td>';  //age 1st fighter
+      re1.Exec(t);
+      data_list.Cells[23, 1] := re1.Match[1];
+      re1.Expression := 'left;">(.*?)</td>';  //age 2nd fighter
+      re1.Exec(t);
+      data_list.Cells[24, 1] := re1.Match[1];
+    end;
+
+  if Pos('<b>stance</b>', s) > 0 then  //stance
+    begin
+      t := Copy(s, Pos('stance', s) - 100, 200);
+      re1.Expression := 'right;">(.*?)</td>';  //stance 1st fighter
+      re1.Exec(t);
+      data_list.Cells[25, 1] := re1.Match[1];
+      re1.Expression := 'left;">(.*?)</td>';  //stance 2nd fighter
+      re1.Exec(t);
+      data_list.Cells[26, 1] := re1.Match[1];
+    end;
+
+  if Pos('<b>height</b>', s) > 0 then  //height
+    begin
+      t := Copy(s, Pos('<b>height</b>', s) - 103, 206);
+      re1.Expression := 'right;">(.*?)</td>';  //height 1st fighter
+      re1.Exec(t);
+      data_list.Cells[27, 1] := re1.Match[1];
+      re1.Expression := 'left;">(.*?)</td>';  //height 2nd fighter
+      re1.Exec(t);
+      data_list.Cells[28, 1] := re1.Match[1];
+      Memo1.Text := t;
+    end;
+
+  if Pos('<b>reach</b>', s) > 0 then  //reach
+    begin
+      t := Copy(s, Pos('<b>reach</b>', s) - 120, 240);
+      re1.Expression := 'right;">(.*?)</td>';  //reach 1st fighter
+      re1.Exec(t);
+      data_list.Cells[29, 1] := re1.Match[1];
+      re1.Expression := 'left;">(.*?)</td>';  //reach 2nd fighter
+      re1.Exec(t);
+      data_list.Cells[30, 1] := re1.Match[1];
+    end;
+
+  if Pos('<b>won</b>', s) > 0 then  //won
+    begin
+      t := Copy(s, Pos('<b>won</b>', s) - 100, 200);
+      re1.Expression := 'right;" class="textWon">(.*?)</td>';  //won 1st fighter
+      re1.Exec(t);
+      data_list.Cells[31, 1] := re1.Match[1];
+      re1.Expression := 'left;" class="textWon">(.*?)</td>';  //won 2nd fighter
+      re1.Exec(t);
+      data_list.Cells[32, 1] := re1.Match[1];
+    end;
+
+  if Pos('<b>lost</b>', s) > 0 then //lost
+    begin
+      t := Copy(s, Pos('<b>lost</b>', s) - 100, 200);
+      re1.Expression := 'right;" class="textLost">(.*?)</td>';  //lost 1st fighter
+      re1.Exec(t);
+      data_list.Cells[33, 1] := re1.Match[1];
+      re1.Expression := 'left;" class="textLost">(.*?)</td>';  //lost 2nd fighter
+      re1.Exec(t);
+      data_list.Cells[34, 1] := re1.Match[1];
+    end;
+
+  if Pos('<b>drawn</b>', s) > 0 then  //drawn
+    begin
+      t := Copy(s, Pos('<b>drawn</b>', s) - 100, 200);
+      re1.Expression := 'right;" class="textDraw">(.*?)</td>';  //drawn 1st fighter
+      re1.Exec(t);
+      data_list.Cells[35, 1] := re1.Match[1];
+      re1.Expression := 'left;" class="textDraw">(.*?)</td>';  //drawn 2nd fighter
+      re1.Exec(t);
+      data_list.Cells[36, 1] := re1.Match[1];
+    end;
+
+  if Pos('<b>KOs</b>', s) > 0 then  //KOs
+    begin
+      t := Copy(s, Pos('<b>KOs</b>', s) - 80, 160);
+      re1.Expression := 'right;">(.*?)</td>';  //KOs 1st fighter
+      re1.Exec(t);
+      data_list.Cells[37, 1] := re1.Match[1];
+      re1.Expression := 'left;">(.*?)</td>';  //KOs 2nd fighter
+      re1.Exec(t);
+      data_list.Cells[38, 1] := re1.Match[1];
+    end;
+
+
 
 end;
 
