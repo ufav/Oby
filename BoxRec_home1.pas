@@ -139,6 +139,7 @@ begin
       lst1 := TStringList.Create;
       lst2 := TStringList.Create;
 
+      //783549/2327203
       s := IdHTTP.Get('http://boxrec.com/en/event/783549/' + Memo1.Lines[k]); //fighters block
       t := Copy(s, Pos('pageHeading', s), Pos('starBase', s) - Pos('pageHeading', s));
 
