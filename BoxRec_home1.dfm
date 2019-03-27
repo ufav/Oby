@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 0
   Top = 0
   Caption = 'Form1'
-  ClientHeight = 512
-  ClientWidth = 781
+  ClientHeight = 623
+  ClientWidth = 1076
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -13,8 +13,8 @@ object Form1: TForm1
   OldCreateOrder = False
   OnCreate = FormCreate
   DesignSize = (
-    781
-    512)
+    1076
+    623)
   PixelsPerInch = 96
   TextHeight = 13
   object Label2: TLabel
@@ -76,15 +76,15 @@ object Form1: TForm1
   object Memo1: TMemo
     Left = 8
     Top = 59
-    Width = 765
+    Width = 505
     Height = 158
     TabOrder = 4
   end
   object data_list: TStringGrid
     Left = 8
     Top = 223
-    Width = 765
-    Height = 281
+    Width = 1060
+    Height = 392
     Anchors = [akLeft, akTop, akRight, akBottom]
     ColCount = 50
     DefaultRowHeight = 18
@@ -92,5 +92,27 @@ object Form1: TForm1
     RowCount = 1000
     Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goColSizing, goEditing]
     TabOrder = 5
+    ExplicitWidth = 765
+    ExplicitHeight = 281
+  end
+  object Button1: TButton
+    Left = 496
+    Top = 16
+    Width = 75
+    Height = 25
+    Caption = 'Button1'
+    TabOrder = 6
+    OnClick = Button1Click
+  end
+  object Memo2: TMemo
+    Left = 519
+    Top = 59
+    Width = 549
+    Height = 158
+    TabOrder = 7
+  end
+  object IdAntiFreeze1: TIdAntiFreeze
+    Left = 648
+    Top = 16
   end
 end
