@@ -6,7 +6,8 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, IdHTTP, RegExpr, IdIOHandler,
   IdIOHandlerSocket, IdIOHandlerStack, IdSSL, IdSSLOpenSSL, IdSSLOpenSSLHeaders,
-  Vcl.StdCtrls, Vcl.Grids, IdBaseComponent, IdAntiFreezeBase, Vcl.IdAntiFreeze;
+  Vcl.StdCtrls, Vcl.Grids, IdBaseComponent, IdAntiFreezeBase,
+  IdAntiFreeze;
 
 type
   TForm1 = class(TForm)
@@ -21,6 +22,7 @@ type
     data_list: TStringGrid;
     Button1: TButton;
     IdAntiFreeze1: TIdAntiFreeze;
+    Memo2: TMemo;
     procedure FormCreate(Sender: TObject);
     procedure cnnctClick(Sender: TObject);
     procedure gtdtClick(Sender: TObject);
@@ -272,7 +274,13 @@ begin
 
       if Pos('<b>age</b>', s) > 0 then  //age
         begin
-          t := Copy(s, Pos('<b>age</b>', s) - 75, 150);
+          j := 100;
+          repeat
+            begin
+              t := Copy(s, Pos('<b>age</b>', s) - j, j * 2);
+              j := j - 5;
+            end;
+          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
           re1.Expression := 'right;">(.*?)</td>';  //age 1st fighter
           re1.Exec(t);
           data_list.Cells[26, i] := re1.Match[1];
@@ -300,7 +308,13 @@ begin
 
       if Pos('<b>height</b>', s) > 0 then  //height
         begin
-          t := Copy(s, Pos('<b>height</b>', s) - 103, 206);
+          j := 150;
+          repeat
+            begin
+              t := Copy(s, Pos('<b>height</b>', s) - j, j * 2);
+              j := j - 5;
+            end;
+          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
           re1.Expression := 'right;">(.*?)</td>';  //height 1st fighter
           re1.Exec(t);
           data_list.Cells[30, i] := re1.Match[1];
@@ -311,18 +325,31 @@ begin
 
       if Pos('<b>reach</b>', s) > 0 then  //reach
         begin
-          t := Copy(s, Pos('<b>reach</b>', s) - 120, 240);
+          j := 150;
+          repeat
+            begin
+              t := Copy(s, Pos('<b>reach</b>', s) - j, j * 2);
+              j := j - 5;
+            end;
+          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
           re1.Expression := 'right;">(.*?)</td>';  //reach 1st fighter
           re1.Exec(t);
           data_list.Cells[32, i] := re1.Match[1];
           re1.Expression := 'left;">(.*?)</td>';  //reach 2nd fighter
           re1.Exec(t);
           data_list.Cells[33, i] := re1.Match[1];
+          Memo2.Text := t;
         end;
 
       if Pos('<b>won</b>', s) > 0 then  //won
         begin
-          t := Copy(s, Pos('<b>won</b>', s) - 100, 200);
+          j := 150;
+          repeat
+            begin
+              t := Copy(s, Pos('<b>won</b>', s) - j, j * 2);
+              j := j - 5;
+            end;
+          until (CountPos('right;" class="textWon">', t) = 1) and (CountPos('left;" class="textWon">', t) = 1);
           re1.Expression := 'right;" class="textWon">(.*?)</td>';  //won 1st fighter
           re1.Exec(t);
           data_list.Cells[34, i] := re1.Match[1];
@@ -355,7 +382,13 @@ begin
 
       if Pos('<b>KOs</b>', s) > 0 then  //KOs
         begin
-          t := Copy(s, Pos('<b>KOs</b>', s) - 80, 160);
+          j := 100;
+          repeat
+            begin
+              t := Copy(s, Pos('<b>KOs</b>', s) - j, j * 2);
+              j := j - 5;
+            end;
+          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
           re1.Expression := 'right;">(.*?)</td>';  //KOs 1st fighter
           re1.Exec(t);
           data_list.Cells[40, i] := re1.Match[1];
