@@ -86,14 +86,12 @@ object Form1: TForm1
     Width = 1060
     Height = 392
     Anchors = [akLeft, akTop, akRight, akBottom]
-    ColCount = 50
+    ColCount = 45
     DefaultRowHeight = 18
     FixedCols = 0
-    RowCount = 1000
+    RowCount = 5000
     Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goColSizing, goEditing]
     TabOrder = 5
-    ExplicitWidth = 765
-    ExplicitHeight = 281
   end
   object Button1: TButton
     Left = 496
@@ -110,6 +108,15 @@ object Form1: TForm1
     Width = 549
     Height = 158
     TabOrder = 7
+  end
+  object Button2: TButton
+    Left = 984
+    Top = 8
+    Width = 75
+    Height = 25
+    Caption = 'Button2'
+    TabOrder = 8
+    OnClick = Button2Click
   end
   object IdAntiFreeze1: TIdAntiFreeze
     Left = 648
