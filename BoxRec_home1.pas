@@ -141,19 +141,25 @@ var
   re1, re2, re3: TRegExpr;
   flag: Boolean;
 begin
-
+  lst3 := TStringList.Create;
   for i := 1 to Memo1.Lines.Count do
     begin
       IdHTTP := TIdHTTP.Create;
       IdHTTP.HandleRedirects := True;
       IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
       re1 := TRegExpr.Create;
-      lst3 := TStringList.Create;
 
-      s := IdHTTP.Get('http://boxrec.com/en/date?lrc[date]' +
+
+
+
+      s := IdHTTP.Get('http://boxrec.com/en/date?Pnr[date][year]=' +
+      Copy(Memo1.Lines.Strings[i - 1], 7, 4) + '&Pnr[date][month]=' +
+      Copy(Memo1.Lines.Strings[i - 1], 4, 2) + '&Pnr[date][day]=' +
+      Copy(Memo1.Lines.Strings[i - 1], 1, 2) + '&d_go=');
+      {s := IdHTTP.Get('http://boxrec.com/en/date?lrc[date]' +
         '[year]=' + Copy(Memo1.Lines.Strings[i - 1], 7, 4) +
         '&lrc[date][month]=' + Copy(Memo1.Lines.Strings[i - 1], 4, 2) +
-        '&lrc[date][day]=' + Copy(Memo1.Lines.Strings[i - 1], 1, 2) + '&d_go=');
+        '&lrc[date][day]=' + Copy(Memo1.Lines.Strings[i - 1], 1, 2) + '&d_go=');}
       re1.Expression := ';">    <a href="/en/event/(.*?)"><div';
       if re1.Exec(s) then
         repeat
@@ -161,8 +167,9 @@ begin
         until not re1.ExecNext;
       FreeAndNil(IdHTTP); //убиваем всё созданное
       FreeAndNil(re1);
-      //Memo2.Text := lst3.Text;
     end;
+
+  Memo2.Text := lst3.Text;
 
   for i := 1 to lst3.Count do
     begin
@@ -252,7 +259,12 @@ begin
           re1.Expression := '20%" style="text-align:right;">(.*?)">';
           if re1.Exec(t) then
             repeat
-              lst1.Add(Trim(Copy(re1.Match[1], Pos('"', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos('"', re1.Match[1]))));
+              begin
+                if Pos(widestring('span class'), re1.Match[1]) = 0 then
+                  lst1.Add('0')
+                else
+                  lst1.Add(Trim(Copy(re1.Match[1], Pos('"', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos('"', re1.Match[1]))));
+              end;
             until not re1.ExecNext;
           lst1.Text := StringReplace(lst1.Text, 'textWon', '1', [rfReplaceAll, rfIgnoreCase]);
           lst1.Text := StringReplace(lst1.Text, 'textLost', '2', [rfReplaceAll, rfIgnoreCase]);
@@ -264,7 +276,12 @@ begin
           re1.Expression := 'left;">(.*?)">';
           if re1.Exec(t) then
             repeat
-              lst1.Add(Trim(Copy(re1.Match[1], Pos('"', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos('"', re1.Match[1]))));
+              begin
+                if Pos(widestring('span class'), re1.Match[1]) = 0 then
+                  lst1.Add('0')
+                else
+                  lst1.Add(Trim(Copy(re1.Match[1], Pos('"', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos('"', re1.Match[1]))));
+              end;
             until not re1.ExecNext;
           lst1.Text := StringReplace(lst1.Text, 'textWon', '1', [rfReplaceAll, rfIgnoreCase]);
           lst1.Text := StringReplace(lst1.Text, 'textLost', '2', [rfReplaceAll, rfIgnoreCase]);
@@ -610,3 +627,4 @@ begin
 end;
 
 end.
+
