@@ -137,11 +137,15 @@ var
   IdHTTP: TIdHTTP;
   s, t, u: string;
   i, j, k: Integer;
-  lst1, lst2, lst3: TStringList;
+  lst1, lst2, lst3, lst4: TStringList;
   re1, re2, re3: TRegExpr;
   flag: Boolean;
+  frst, scnd, edate, refr, prom, mm, fj, sj, tj, loc, fl6, sl6, cntst, rnds, wld, twon, rwon, fr, sr, fage, sage, fstnc, sstnc, fhgth, shgth, frch, srch, fwon, swon, flost, slost, fdrwn, sdrwn, fko, sko, fbd, sbd, fres, sres, fbp, sbp: string;
 begin
+
   lst3 := TStringList.Create;
+  lst4 := TStringList.Create;
+
   for i := 1 to Memo1.Lines.Count do
     begin
       IdHTTP := TIdHTTP.Create;
@@ -172,378 +176,406 @@ begin
   Memo2.Text := lst3.Text;
 
   for i := 1 to lst3.Count do
-    begin
-      IdHTTP := TIdHTTP.Create;
-      IdHTTP.HandleRedirects := True;
-      IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
+    try
+      begin
+        IdHTTP := TIdHTTP.Create;
+        IdHTTP.HandleRedirects := True;
+        IdHTTP.Request.UserAgent := 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36';
 
-      re1 := TRegExpr.Create;
-      lst1 := TStringList.Create;
-      lst2 := TStringList.Create;
+        re1 := TRegExpr.Create;
+        lst1 := TStringList.Create;
+        lst2 := TStringList.Create;
 
-      s := IdHTTP.Get('http://boxrec.com/en/event/' + lst3.Strings[i - 1]); //fighters block
-      t := Copy(s, Pos('pageHeading', s), Pos('starBase', s) - Pos('pageHeading', s));
-      //.Text := s;
+        s := IdHTTP.Get('http://boxrec.com/en/event/' + lst3.Strings[i - 1]); //fighters block
+        t := Copy(s, Pos('pageHeading', s), Pos('starBase', s) - Pos('pageHeading', s));
+        //.Text := s;
 
-      if Pos('TBA', t) > 0 then Continue;
+        if Pos('TBA', t) > 0 then Continue;
 
-      re1.Expression := 'Link">(.*?)</a>';  //fighters
-      if re1.Exec(t) then
-        repeat
-          lst1.Add(re1.Match[1]);
-        until not re1.ExecNext;
-      data_list.Cells[0, i] := lst1.Strings[0];
-      data_list.Cells[1, i] := lst1.Strings[1];
-      lst1.Clear;
+        re1.Expression := 'Link">(.*?)</a>';  //fighters
+        if re1.Exec(t) then
+          repeat
+            lst1.Add(re1.Match[1]);
+          until not re1.ExecNext;
+        frst := lst1.Strings[0];
+        scnd := lst1.Strings[1];
+        data_list.Cells[0, i] := lst1.Strings[0];
+        data_list.Cells[1, i] := lst1.Strings[1];
+        lst1.Clear;
 
-      re1.Expression := '\d{4}-\d{2}-\d{2}';  //event's date
-      re1.Exec(s);
-      data_list.Cells[2, i] := re1.Match[0];
+        re1.Expression := '\d{4}-\d{2}-\d{2}';  //event's date
+        re1.Exec(s);
+        edate := re1.Match[0];
+        data_list.Cells[2, i] := re1.Match[0];
 
-      if Pos('/referee/', s) > 0 then //referee*
-        begin
-          t := Copy(s, Pos('/referee/', s), 200);
-          re1.Expression := 'Link">(.*?)</a>';
-          re1.Exec(t);
-          data_list.Cells[3, i] := re1.Match[1];
-        end;
+        if Pos('/referee/', s) > 0 then //referee*
+          begin
+            t := Copy(s, Pos('/referee/', s), 200);
+            re1.Expression := 'Link">(.*?)</a>';
+            re1.Exec(t);
+            refr := re1.Match[1];
+            data_list.Cells[3, i] := re1.Match[1];
+          end;
 
-      if Pos('<b>promoter</b>', s) > 0 then //promoters*
-        begin
-          t := Copy(s, Pos('<b>promoter</b>', s), Pos('footerAd', s) - Pos('<b>promoter</b>', s));
-          re1.Expression := 'ter</b>(.*?)</tr>';
-          re1.Exec(t);
-          data_list.Cells[4, i] := StripTag(re1.Match[1]);
-        end;
+        if Pos('<b>promoter</b>', s) > 0 then //promoters*
+          begin
+            t := Copy(s, Pos('<b>promoter</b>', s), Pos('footerAd', s) - Pos('<b>promoter</b>', s));
+            re1.Expression := 'ter</b>(.*?)</tr>';
+            re1.Exec(t);
+            prom := StripTag(re1.Match[1]);
+            data_list.Cells[4, i] := StripTag(re1.Match[1]);
+          end;
 
-      if Pos('<b>matchmaker</b>', s) > 0 then //matchmakers*
-        begin
-          t := Copy(s, Pos('<b>matchmaker</b>', s), Pos('footerAd', s) - Pos('<b>matchmaker</b>', s));
-          re1.Expression := 'ker</b>(.*?)</tr>';
-          re1.Exec(t);
-          data_list.Cells[5, i] := StripTag(re1.Match[1]);
-        end;
+        if Pos('<b>matchmaker</b>', s) > 0 then //matchmakers*
+          begin
+            t := Copy(s, Pos('<b>matchmaker</b>', s), Pos('footerAd', s) - Pos('<b>matchmaker</b>', s));
+            re1.Expression := 'ker</b>(.*?)</tr>';
+            re1.Exec(t);
+            mm := StripTag(re1.Match[1]);
+            data_list.Cells[5, i] := StripTag(re1.Match[1]);
+          end;
 
-      if Pos('/judge/', s) > 0 then //judges*
-        begin
-          re1.Expression := '/judge/(.*?)</td>';
-          if re1.Exec(s) then
+        if Pos('/judge/', s) > 0 then //judges*
+          begin
+            re1.Expression := '/judge/(.*?)</td>';
+            if re1.Exec(s) then
+              repeat
+                lst1.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            re1.Expression := 'Link">(.*?)</a>';
+            if re1.Exec(lst1.Text) then
+              repeat
+                lst2.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            fj := lst2.strings[0];
+            data_list.Cells[6, i] := lst2.strings[0];
+            if CountPos('/judge/', s) > 1 then
+              begin
+                sj := lst2.strings[1];
+                data_list.Cells[7, i] := lst2.Strings[1];
+              end;
+            if CountPos('/judge/', s) > 2 then
+              begin
+                tj := lst2.strings[2];
+                data_list.Cells[8, i] := lst2.Strings[2];
+              end;
+            lst1.Clear;
+            lst2.Clear;
+          end;
+
+        if Pos('/venue/', s) > 0 then //location*
+          begin
+            t := Copy(s, Pos('/venue/', s), Pos('responseLessDataTable', s) - Pos('/venue/', s));
+            re1.Expression := '\d{2}">(.*?)<br>';
+            re1.Exec(t);
+            loc := Trim(StripTag(re1.Match[1]));
+            data_list.Cells[9, i] := Trim(StripTag(re1.Match[1]));
+          end;
+
+        if Pos('<b>last 6</b>', s) > 0 then //1st last 6*
+          begin
+            t := Copy(s, Pos('<b>last 6</b>', s), Pos('footerAd', s) - Pos('<b>last 6</b>', s));
+            re1.Expression := '20%" style="text-align:right;">(.*?)">';
+            if re1.Exec(t) then
+              repeat
+                begin
+                  if Pos(widestring('span class'), re1.Match[1]) = 0 then
+                    lst1.Add('0')
+                  else
+                    lst1.Add(Trim(Copy(re1.Match[1], Pos('"', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos('"', re1.Match[1]))));
+                end;
+              until not re1.ExecNext;
+            lst1.Text := StringReplace(lst1.Text, 'textWon', '1', [rfReplaceAll, rfIgnoreCase]);
+            lst1.Text := StringReplace(lst1.Text, 'textLost', '2', [rfReplaceAll, rfIgnoreCase]);
+            lst1.Text := StringReplace(lst1.Text, 'textDrawn', '3', [rfReplaceAll, rfIgnoreCase]);
+            lst1.Delimiter := ';';
+            data_list.Cells[10, i] := lst1.DelimitedText;
+            data_list.Cells[10, i] := StringReplace(data_list.Cells[10, i] , ';', '', [rfReplaceAll, rfIgnoreCase]);
+            fl6 := data_list.Cells[10, i];
+            lst1.Clear;
+            re1.Expression := 'left;">(.*?)">';
+            if re1.Exec(t) then
+              repeat
+                begin
+                  if Pos(widestring('span class'), re1.Match[1]) = 0 then
+                    lst1.Add('0')
+                  else
+                    lst1.Add(Trim(Copy(re1.Match[1], Pos('"', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos('"', re1.Match[1]))));
+                end;
+              until not re1.ExecNext;
+            lst1.Text := StringReplace(lst1.Text, 'textWon', '1', [rfReplaceAll, rfIgnoreCase]);
+            lst1.Text := StringReplace(lst1.Text, 'textLost', '2', [rfReplaceAll, rfIgnoreCase]);
+            lst1.Text := StringReplace(lst1.Text, 'textDrawn', '3', [rfReplaceAll, rfIgnoreCase]);
+            lst1.Delimiter := ';';
+            data_list.Cells[11, i] := lst1.DelimitedText;
+            data_list.Cells[11, i] := StringReplace(data_list.Cells[11, i] , ';', '', [rfReplaceAll, rfIgnoreCase]);
+            sl6 := data_list.Cells[11, i];
+            lst1.Clear;
+          end;
+
+            {t := Copy(s, Pos('<b>judges</b>', s), 1500);  //judge's scorecards
+            re1.Expression := '8em;" width="40\%">(.*?)</td>';
+            if re1.Exec(t) then
+              repeat
+                lst1.Add(re1.Match[1]);
+              until not re1.ExecNext;
+            data_list.Cells[9, i] := lst1.strings[0];
+            data_list.Cells[10, i] := lst1.Strings[1];
+            data_list.Cells[11, i] := lst1.Strings[2];
+            data_list.Cells[12, i] := lst1.Strings[3];
+            if CountPos('/judge/', s) > 2 then
+              begin
+                data_list.Cells[13, i] := lst1.Strings[4];
+                data_list.Cells[14, i] := lst1.Strings[5];
+              end;
+            lst1.Clear;}
+
+        t := Copy(s, Pos('primaryIcon', s), Pos('responseLessDataTable', s) - Pos('primaryIcon', s));  //Contest, Rounds
+        re1.Expression := '<h2>(.*?)</h2>';
+        re1.Exec(t);
+        data_list.Cells[12, i] := Trim(StringReplace(Copy(re1.Match[1], 1, Pos(',', re1.Match[1]) - 1), 'Contest', '', [rfReplaceAll, rfIgnoreCase]));
+        data_list.Cells[13, i] := Trim(StringReplace(copy(re1.Match[1], Pos(',', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos(',', re1.Match[1]) + 1), 'Rounds', '', [rfReplaceAll, rfIgnoreCase]));
+        cntst := data_list.Cells[12, i];
+        rnds := data_list.Cells[13, i];
+
+        t := Copy(s, Pos('starBase', s), Pos('<b>ranking</b>', s) - Pos('starBase', s));  //WLD
+        t := Copy(t, Pos(data_list.Cells[0, i], t), Pos(data_list.Cells[1, i], t) - Pos(data_list.Cells[0, i], t));
+        if Pos('textWon', t) > 0 then
+          data_list.Cells[14, i] := '1'
+        else
+          data_list.Cells[14, i] := '2';
+
+        if Pos('<br><span class="textDrawn">', s) > 0 then  //text drawn
+          begin
+            data_list.Cells[14, i] := '0';
+            re1.Expression := 'textDrawn">(.*?)</span>';
+            re1.Exec(s);
+            data_list.Cells[15, i] := re1.Match[1];
+          end
+        else
+          begin
+            t := Copy(s, Pos('<br><span class="textWon">', s), 200);  //text won
+            re1.Expression := 'Won">(.*?)</span>';
+            re1.Exec(t);
+            data_list.Cells[15, i] := Trim(StringReplace(re1.Match[1], 'won', '', [rfReplaceAll, rfIgnoreCase]));
+
+            re1.Expression := '\s<br>(.*?)\n';  //round won
+            re1.Exec(t);
+            data_list.Cells[16, i] := Trim(StringReplace(re1.Match[1], 'round', '', [rfReplaceAll, rfIgnoreCase]));
+          end;
+
+        t := Copy(s, Pos('ranking', s), Pos('details', s) - Pos('ranking', s)); //ranking
+        t := StringReplace(t, 'points', '', [rfReplaceAll, rfIgnoreCase]);
+        re1.Expression := 'right;">(.*?)</td>'; //1st fighter
+        if re1.Exec(t) then
+          repeat
+            lst1.Add(re1.Match[1]);
+          until not re1.ExecNext;
+        data_list.Cells[17, i] := lst1.strings[0];  //ranking
+        data_list.Cells[18, i] := lst1.Strings[1];  //points before fight
+        data_list.Cells[19, i] := lst1.Strings[2];  //points after fight
+        lst1.Clear;
+
+        re1.Expression := 'left;">(.*?)</td>';  //2nd fighter
+        if re1.Exec(t) then
+          repeat
+            lst1.Add(re1.Match[1]);
+          until not re1.ExecNext;
+        data_list.Cells[20, i] := lst1.strings[0];  //ranking
+        data_list.Cells[21, i] := lst1.Strings[1];  //points before fight
+        data_list.Cells[22, i] := lst1.Strings[2];  //points after fight
+        lst1.Clear;
+
+        if Pos('<b>age</b>', s) > 0 then  //age
+          begin
+            j := 100;
+            repeat
+              begin
+                t := Copy(s, Pos('<b>age</b>', s) - j, j * 2);
+                j := j - 5;
+              end;
+            until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
+            re1.Expression := 'right;">(.*?)</td>';  //age 1st fighter
+            re1.Exec(t);
+            data_list.Cells[23, i] := re1.Match[1];
+            re1.Expression := 'left;">(.*?)</td>';  //age 2nd fighter
+            re1.Exec(t);
+            data_list.Cells[24, i] := re1.Match[1];
+          end;
+
+        if Pos('<b>stance</b>', s) > 0 then  //stance
+          begin
+            j := 200;
+            repeat
+              begin
+                t := Copy(s, Pos('stance', s) - j, j * 2);
+                j := j - 5;
+              end;
+            until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
+            re1.Expression := 'right;">(.*?)</td>';  //stance 1st fighter
+            re1.Exec(t);
+            data_list.Cells[25, i] := re1.Match[1];
+            re1.Expression := 'left;">(.*?)</td>';  //stance 2nd fighter
+            re1.Exec(t);
+            data_list.Cells[26, i] := re1.Match[1];
+          end;
+
+        if Pos('<b>height</b>', s) > 0 then  //height
+          begin
+            j := 150;
+            repeat
+              begin
+                t := Copy(s, Pos('<b>height</b>', s) - j, j * 2);
+                j := j - 5;
+              end;
+            until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
+            re1.Expression := 'right;">(.*?)</td>';  //height 1st fighter
+            re1.Exec(t);
+            data_list.Cells[27, i] := re1.Match[1];
+            re1.Expression := 'left;">(.*?)</td>';  //height 2nd fighter
+            re1.Exec(t);
+            data_list.Cells[28, i] := re1.Match[1];
+          end;
+
+        if Pos('<b>reach</b>', s) > 0 then  //reach
+          begin
+            j := 150;
+            repeat
+              begin
+                t := Copy(s, Pos('<b>reach</b>', s) - j, j * 2);
+                j := j - 5;
+              end;
+            until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
+            re1.Expression := 'right;">(.*?)</td>';  //reach 1st fighter
+            re1.Exec(t);
+            data_list.Cells[29, i] := re1.Match[1];
+            re1.Expression := 'left;">(.*?)</td>';  //reach 2nd fighter
+            re1.Exec(t);
+            data_list.Cells[30, i] := re1.Match[1];
+          end;
+
+        if Pos('<b>won</b>', s) > 0 then  //won
+          begin
+            j := 150;
+            repeat
+              begin
+                t := Copy(s, Pos('<b>won</b>', s) - j, j * 2);
+                j := j - 5;
+              end;
+            until (CountPos('right;" class="textWon">', t) = 1) and (CountPos('left;" class="textWon">', t) = 1);
+            re1.Expression := 'right;" class="textWon">(.*?)</td>';  //won 1st fighter
+            re1.Exec(t);
+            data_list.Cells[31, i] := re1.Match[1];
+            re1.Expression := 'left;" class="textWon">(.*?)</td>';  //won 2nd fighter
+            re1.Exec(t);
+            data_list.Cells[32, i] := re1.Match[1];
+          end;
+
+        if Pos('<b>lost</b>', s) > 0 then //lost
+          begin
+            t := Copy(s, Pos('<b>lost</b>', s) - 100, 200);
+            re1.Expression := 'right;" class="textLost">(.*?)</td>';  //lost 1st fighter
+            re1.Exec(t);
+            data_list.Cells[33, i] := re1.Match[1];
+            re1.Expression := 'left;" class="textLost">(.*?)</td>';  //lost 2nd fighter
+            re1.Exec(t);
+            data_list.Cells[34, i] := re1.Match[1];
+          end;
+
+        if Pos('<b>drawn</b>', s) > 0 then  //drawn
+          begin
+            t := Copy(s, Pos('<b>drawn</b>', s) - 100, 200);
+            re1.Expression := 'right;" class="textDraw">(.*?)</td>';  //drawn 1st fighter
+            re1.Exec(t);
+            data_list.Cells[35, i] := re1.Match[1];
+            re1.Expression := 'left;" class="textDraw">(.*?)</td>';  //drawn 2nd fighter
+            re1.Exec(t);
+            data_list.Cells[36, i] := re1.Match[1];
+          end;
+
+        if Pos('<b>KOs</b>', s) > 0 then  //KOs
+          begin
+            j := 100;
+            repeat
+              begin
+                t := Copy(s, Pos('<b>KOs</b>', s) - j, j * 2);
+                j := j - 5;
+              end;
+            until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
+            re1.Expression := 'right;">(.*?)</td>';  //KOs 1st fighter
+            re1.Exec(t);
+            data_list.Cells[37, i] := re1.Match[1];
+            re1.Expression := 'left;">(.*?)</td>';  //KOs 2nd fighter
+            re1.Exec(t);
+            data_list.Cells[38, i] := re1.Match[1];
+          end;
+
+        try
+
+          t := Copy(s, Pos('singleColumn', s), Pos('starBase', s) - Pos('singleColumn', s));
+          re1.Expression := '<a href="(.*?)" cla';
+          if re1.Exec(t) then
             repeat
               lst1.Add(re1.Match[1]);
             until not re1.ExecNext;
-          re1.Expression := 'Link">(.*?)</a>';
-          if re1.Exec(lst1.Text) then
-            repeat
-              lst2.Add(re1.Match[1]);
-            until not re1.ExecNext;
-          data_list.Cells[6, i] := lst2.strings[0];
-          if CountPos('/judge/', s) > 1 then
-            data_list.Cells[7, i] := lst2.Strings[1];
-          if CountPos('/judge/', s) > 2 then
-            data_list.Cells[8, i] := lst2.Strings[2];
-          lst1.Clear;
-          lst2.Clear;
-        end;
 
-      if Pos('/venue/', s) > 0 then //location*
-        begin
-          t := Copy(s, Pos('/venue/', s), Pos('responseLessDataTable', s) - Pos('/venue/', s));
-          re1.Expression := '\d{2}">(.*?)<br>';
+          t := IdHTTP.Get('http://boxrec.com' + lst1.Strings[0]);
+
+          re1.Expression := '"birthDate">(.*?)</span>'; //1st birthdate
           re1.Exec(t);
-          data_list.Cells[9, i] := Trim(StripTag(re1.Match[1]));
-        end;
+          data_list.Cells[39, i] := re1.Match[1];
 
-      if Pos('<b>last 6</b>', s) > 0 then //1st last 6*
-        begin
-          t := Copy(s, Pos('<b>last 6</b>', s), Pos('footerAd', s) - Pos('<b>last 6</b>', s));
-          re1.Expression := '20%" style="text-align:right;">(.*?)">';
-          if re1.Exec(t) then
-            repeat
-              begin
-                if Pos(widestring('span class'), re1.Match[1]) = 0 then
-                  lst1.Add('0')
-                else
-                  lst1.Add(Trim(Copy(re1.Match[1], Pos('"', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos('"', re1.Match[1]))));
-              end;
-            until not re1.ExecNext;
-          lst1.Text := StringReplace(lst1.Text, 'textWon', '1', [rfReplaceAll, rfIgnoreCase]);
-          lst1.Text := StringReplace(lst1.Text, 'textLost', '2', [rfReplaceAll, rfIgnoreCase]);
-          lst1.Text := StringReplace(lst1.Text, 'textDrawn', '3', [rfReplaceAll, rfIgnoreCase]);
-          lst1.Delimiter := ';';
-          data_list.Cells[10, i] := lst1.DelimitedText;
-          data_list.Cells[10, i] := StringReplace(data_list.Cells[10, i] , ';', '', [rfReplaceAll, rfIgnoreCase]);
-          lst1.Clear;
-          re1.Expression := 'left;">(.*?)">';
-          if re1.Exec(t) then
-            repeat
-              begin
-                if Pos(widestring('span class'), re1.Match[1]) = 0 then
-                  lst1.Add('0')
-                else
-                  lst1.Add(Trim(Copy(re1.Match[1], Pos('"', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos('"', re1.Match[1]))));
-              end;
-            until not re1.ExecNext;
-          lst1.Text := StringReplace(lst1.Text, 'textWon', '1', [rfReplaceAll, rfIgnoreCase]);
-          lst1.Text := StringReplace(lst1.Text, 'textLost', '2', [rfReplaceAll, rfIgnoreCase]);
-          lst1.Text := StringReplace(lst1.Text, 'textDrawn', '3', [rfReplaceAll, rfIgnoreCase]);
-          lst1.Delimiter := ';';
-          data_list.Cells[11, i] := lst1.DelimitedText;
-          data_list.Cells[11, i] := StringReplace(data_list.Cells[11, i] , ';', '', [rfReplaceAll, rfIgnoreCase]);
-          lst1.Clear;
-        end;
-
-          {t := Copy(s, Pos('<b>judges</b>', s), 1500);  //judge's scorecards
-          re1.Expression := '8em;" width="40\%">(.*?)</td>';
-          if re1.Exec(t) then
-            repeat
-              lst1.Add(re1.Match[1]);
-            until not re1.ExecNext;
-          data_list.Cells[9, i] := lst1.strings[0];
-          data_list.Cells[10, i] := lst1.Strings[1];
-          data_list.Cells[11, i] := lst1.Strings[2];
-          data_list.Cells[12, i] := lst1.Strings[3];
-          if CountPos('/judge/', s) > 2 then
+          if Pos('<b>residence</b>', t) > 0 then //1st residence
             begin
-              data_list.Cells[13, i] := lst1.Strings[4];
-              data_list.Cells[14, i] := lst1.Strings[5];
+              u := Copy(t, Pos('<b>residence</b>', t), Pos('clickableIcon add', t) - Pos('<b>residence</b>', t));
+              re1.Expression := '">(.*?)</tr>';
+              re1.Exec(u);
+              data_list.Cells[41, i] := Trim(StripTag(re1.Match[1]));
             end;
-          lst1.Clear;}
 
-      t := Copy(s, Pos('primaryIcon', s), Pos('responseLessDataTable', s) - Pos('primaryIcon', s));  //Contest, Rounds
-      re1.Expression := '<h2>(.*?)</h2>';
-      re1.Exec(t);
-      data_list.Cells[12, i] := Trim(StringReplace(Copy(re1.Match[1], 1, Pos(',', re1.Match[1]) - 1), 'Contest', '', [rfReplaceAll, rfIgnoreCase]));
-      data_list.Cells[13, i] := Trim(StringReplace(copy(re1.Match[1], Pos(',', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos(',', re1.Match[1]) + 1), 'Rounds', '', [rfReplaceAll, rfIgnoreCase]));
-
-      t := Copy(s, Pos('starBase', s), Pos('<b>ranking</b>', s) - Pos('starBase', s));  //WLD
-      t := Copy(t, Pos(data_list.Cells[0, i], t), Pos(data_list.Cells[1, i], t) - Pos(data_list.Cells[0, i], t));
-      if Pos('textWon', t) > 0 then
-        data_list.Cells[14, i] := '1'
-      else
-        data_list.Cells[14, i] := '2';
-
-      if Pos('<br><span class="textDrawn">', s) > 0 then  //text drawn
-        begin
-          data_list.Cells[14, i] := '0';
-          re1.Expression := 'textDrawn">(.*?)</span>';
-          re1.Exec(s);
-          data_list.Cells[15, i] := re1.Match[1];
-        end
-      else
-        begin
-          t := Copy(s, Pos('<br><span class="textWon">', s), 200);  //text won
-          re1.Expression := 'Won">(.*?)</span>';
-          re1.Exec(t);
-          data_list.Cells[15, i] := Trim(StringReplace(re1.Match[1], 'won', '', [rfReplaceAll, rfIgnoreCase]));
-
-          re1.Expression := '\s<br>(.*?)\n';  //round won
-          re1.Exec(t);
-          data_list.Cells[16, i] := Trim(StringReplace(re1.Match[1], 'round', '', [rfReplaceAll, rfIgnoreCase]));
-        end;
-
-      t := Copy(s, Pos('ranking', s), Pos('details', s) - Pos('ranking', s)); //ranking
-      t := StringReplace(t, 'points', '', [rfReplaceAll, rfIgnoreCase]);
-      re1.Expression := 'right;">(.*?)</td>'; //1st fighter
-      if re1.Exec(t) then
-        repeat
-          lst1.Add(re1.Match[1]);
-        until not re1.ExecNext;
-      data_list.Cells[17, i] := lst1.strings[0];  //ranking
-      data_list.Cells[18, i] := lst1.Strings[1];  //points before fight
-      data_list.Cells[19, i] := lst1.Strings[2];  //points after fight
-      lst1.Clear;
-
-      re1.Expression := 'left;">(.*?)</td>';  //2nd fighter
-      if re1.Exec(t) then
-        repeat
-          lst1.Add(re1.Match[1]);
-        until not re1.ExecNext;
-      data_list.Cells[20, i] := lst1.strings[0];  //ranking
-      data_list.Cells[21, i] := lst1.Strings[1];  //points before fight
-      data_list.Cells[22, i] := lst1.Strings[2];  //points after fight
-      lst1.Clear;
-
-      if Pos('<b>age</b>', s) > 0 then  //age
-        begin
-          j := 100;
-          repeat
+          if Pos('<b>birth place</b>', t) > 0 then //1st birthplace
             begin
-              t := Copy(s, Pos('<b>age</b>', s) - j, j * 2);
-              j := j - 5;
+              u := Copy(t, Pos('<b>birth place</b>', t), Pos('clickableIcon add', t) - Pos('<b>birth place</b>', t));
+              re1.Expression := '">(.*?)</tr>';
+              re1.Exec(u);
+              data_list.Cells[43, i] := Trim(StripTag(re1.Match[1]));
             end;
-          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
-          re1.Expression := 'right;">(.*?)</td>';  //age 1st fighter
-          re1.Exec(t);
-          data_list.Cells[23, i] := re1.Match[1];
-          re1.Expression := 'left;">(.*?)</td>';  //age 2nd fighter
-          re1.Exec(t);
-          data_list.Cells[24, i] := re1.Match[1];
-        end;
 
-      if Pos('<b>stance</b>', s) > 0 then  //stance
-        begin
-          j := 200;
-          repeat
+          t := IdHTTP.Get('http://boxrec.com' + lst1.Strings[1]);
+
+          re1.Expression := '"birthDate">(.*?)</span>'; //2nd birthdate
+          re1.Exec(t);
+          data_list.Cells[40, i] := re1.Match[1];
+
+          if Pos('<b>residence</b>', t) > 0 then //2nd residence
             begin
-              t := Copy(s, Pos('stance', s) - j, j * 2);
-              j := j - 5;
+              u := Copy(t, Pos('<b>residence</b>', t), Pos('clickableIcon add', t) - Pos('<b>residence</b>', t));
+              re1.Expression := '">(.*?)</tr>';
+              re1.Exec(u);
+              data_list.Cells[42, i] := Trim(StripTag(re1.Match[1]));
             end;
-          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
-          re1.Expression := 'right;">(.*?)</td>';  //stance 1st fighter
-          re1.Exec(t);
-          data_list.Cells[25, i] := re1.Match[1];
-          re1.Expression := 'left;">(.*?)</td>';  //stance 2nd fighter
-          re1.Exec(t);
-          data_list.Cells[26, i] := re1.Match[1];
-        end;
 
-      if Pos('<b>height</b>', s) > 0 then  //height
-        begin
-          j := 150;
-          repeat
+          if Pos('<b>birth place</b>', t) > 0 then //2nd birthplace
             begin
-              t := Copy(s, Pos('<b>height</b>', s) - j, j * 2);
-              j := j - 5;
+              u := Copy(t, Pos('<b>birth place</b>', t), Pos('clickableIcon add', t) - Pos('<b>birth place</b>', t));
+              re1.Expression := '">(.*?)</tr>';
+              re1.Exec(u);
+              data_list.Cells[44, i] := Trim(StripTag(re1.Match[1]));
             end;
-          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
-          re1.Expression := 'right;">(.*?)</td>';  //height 1st fighter
-          re1.Exec(t);
-          data_list.Cells[27, i] := re1.Match[1];
-          re1.Expression := 'left;">(.*?)</td>';  //height 2nd fighter
-          re1.Exec(t);
-          data_list.Cells[28, i] := re1.Match[1];
+
+        except
+          Continue;
         end;
 
-      if Pos('<b>reach</b>', s) > 0 then  //reach
-        begin
-          j := 150;
-          repeat
-            begin
-              t := Copy(s, Pos('<b>reach</b>', s) - j, j * 2);
-              j := j - 5;
-            end;
-          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
-          re1.Expression := 'right;">(.*?)</td>';  //reach 1st fighter
-          re1.Exec(t);
-          data_list.Cells[29, i] := re1.Match[1];
-          re1.Expression := 'left;">(.*?)</td>';  //reach 2nd fighter
-          re1.Exec(t);
-          data_list.Cells[30, i] := re1.Match[1];
-        end;
+        lst1.Clear;
 
-      if Pos('<b>won</b>', s) > 0 then  //won
-        begin
-          j := 150;
-          repeat
-            begin
-              t := Copy(s, Pos('<b>won</b>', s) - j, j * 2);
-              j := j - 5;
-            end;
-          until (CountPos('right;" class="textWon">', t) = 1) and (CountPos('left;" class="textWon">', t) = 1);
-          re1.Expression := 'right;" class="textWon">(.*?)</td>';  //won 1st fighter
-          re1.Exec(t);
-          data_list.Cells[31, i] := re1.Match[1];
-          re1.Expression := 'left;" class="textWon">(.*?)</td>';  //won 2nd fighter
-          re1.Exec(t);
-          data_list.Cells[32, i] := re1.Match[1];
-        end;
-
-      if Pos('<b>lost</b>', s) > 0 then //lost
-        begin
-          t := Copy(s, Pos('<b>lost</b>', s) - 100, 200);
-          re1.Expression := 'right;" class="textLost">(.*?)</td>';  //lost 1st fighter
-          re1.Exec(t);
-          data_list.Cells[33, i] := re1.Match[1];
-          re1.Expression := 'left;" class="textLost">(.*?)</td>';  //lost 2nd fighter
-          re1.Exec(t);
-          data_list.Cells[34, i] := re1.Match[1];
-        end;
-
-      if Pos('<b>drawn</b>', s) > 0 then  //drawn
-        begin
-          t := Copy(s, Pos('<b>drawn</b>', s) - 100, 200);
-          re1.Expression := 'right;" class="textDraw">(.*?)</td>';  //drawn 1st fighter
-          re1.Exec(t);
-          data_list.Cells[35, i] := re1.Match[1];
-          re1.Expression := 'left;" class="textDraw">(.*?)</td>';  //drawn 2nd fighter
-          re1.Exec(t);
-          data_list.Cells[36, i] := re1.Match[1];
-        end;
-
-      if Pos('<b>KOs</b>', s) > 0 then  //KOs
-        begin
-          j := 100;
-          repeat
-            begin
-              t := Copy(s, Pos('<b>KOs</b>', s) - j, j * 2);
-              j := j - 5;
-            end;
-          until (CountPos('right;">', t) = 1) and (CountPos('left;">', t) = 1);
-          re1.Expression := 'right;">(.*?)</td>';  //KOs 1st fighter
-          re1.Exec(t);
-          data_list.Cells[37, i] := re1.Match[1];
-          re1.Expression := 'left;">(.*?)</td>';  //KOs 2nd fighter
-          re1.Exec(t);
-          data_list.Cells[38, i] := re1.Match[1];
-        end;
-
-      t := Copy(s, Pos('singleColumn', s), Pos('starBase', s) - Pos('singleColumn', s));
-      re1.Expression := '<a href="(.*?)" cla';
-      if re1.Exec(t) then
-        repeat
-          lst1.Add(re1.Match[1]);
-        until not re1.ExecNext;
-
-      t := IdHTTP.Get('http://boxrec.com' + lst1.Strings[0]);
-
-      re1.Expression := '"birthDate">(.*?)</span>'; //1st birthdate
-      re1.Exec(t);
-      data_list.Cells[39, i] := re1.Match[1];
-
-      if Pos('<b>residence</b>', t) > 0 then //1st residence
-        begin
-          u := Copy(t, Pos('<b>residence</b>', t), Pos('clickableIcon add', t) - Pos('<b>residence</b>', t));
-          re1.Expression := '">(.*?)</tr>';
-          re1.Exec(u);
-          data_list.Cells[41, i] := Trim(StripTag(re1.Match[1]));
-        end;
-
-      if Pos('<b>birth place</b>', t) > 0 then //1st birthplace
-        begin
-          u := Copy(t, Pos('<b>birth place</b>', t), Pos('clickableIcon add', t) - Pos('<b>birth place</b>', t));
-          re1.Expression := '">(.*?)</tr>';
-          re1.Exec(u);
-          data_list.Cells[43, i] := Trim(StripTag(re1.Match[1]));
-        end;
-
-      t := IdHTTP.Get('http://boxrec.com' + lst1.Strings[1]);
-
-      re1.Expression := '"birthDate">(.*?)</span>'; //2nd birthdate
-      re1.Exec(t);
-      data_list.Cells[40, i] := re1.Match[1];
-
-      if Pos('<b>residence</b>', t) > 0 then //2nd residence
-        begin
-          u := Copy(t, Pos('<b>residence</b>', t), Pos('clickableIcon add', t) - Pos('<b>residence</b>', t));
-          re1.Expression := '">(.*?)</tr>';
-          re1.Exec(u);
-          data_list.Cells[42, i] := Trim(StripTag(re1.Match[1]));
-        end;
-
-      if Pos('<b>birth place</b>', t) > 0 then //2nd birthplace
-        begin
-          u := Copy(t, Pos('<b>birth place</b>', t), Pos('clickableIcon add', t) - Pos('<b>birth place</b>', t));
-          re1.Expression := '">(.*?)</tr>';
-          re1.Exec(u);
-          data_list.Cells[44, i] := Trim(StripTag(re1.Match[1]));
-        end;
-
-      lst1.Clear;
-
-      FreeAndNil(IdHTTP); //убиваем всё созданное
-      FreeAndNil(lst1);
-      FreeAndNil(lst2);
-      FreeAndNil(re1);
+        FreeAndNil(IdHTTP); //убиваем всё созданное
+        FreeAndNil(lst1);
+        FreeAndNil(lst2);
+        FreeAndNil(re1);
+      end;
+    except
+      Continue;
     end;
 
   lst3.Clear;
