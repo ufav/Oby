@@ -118,6 +118,15 @@ object Form1: TForm1
     TabOrder = 8
     OnClick = Button2Click
   end
+  object Button3: TButton
+    Left = 760
+    Top = 8
+    Width = 75
+    Height = 25
+    Caption = #1058#1086#1095#1077#1095#1085#1086
+    TabOrder = 9
+    OnClick = Button3Click
+  end
   object IdAntiFreeze1: TIdAntiFreeze
     Left = 648
     Top = 16
