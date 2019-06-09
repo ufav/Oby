@@ -25,8 +25,8 @@ type
     Memo2: TMemo;
     Button2: TButton;
     Button3: TButton;
-    Memo3: TMemo;
     SaveDialog1: TSaveDialog;
+    Memo3: TMemo;
     procedure FormCreate(Sender: TObject);
     procedure cnnctClick(Sender: TObject);
     procedure gtdtClick(Sender: TObject);
@@ -223,7 +223,11 @@ begin
                 IdHTTP.Post('http://boxrec.com/en/login', lp);
               end;
             except
-              Label3.Caption := 'Connection error';
+              begin
+                Label3.Caption := 'Connection error';
+                Memo3.Lines.Add(lst3.Strings[i - 1]);
+                Continue;
+              end;
             end;
             FreeAndNil(IdHTTP);
             FreeAndNil(lp);
@@ -248,15 +252,15 @@ begin
           repeat
             lst1.Add(re1.Match[1]);
           until not re1.ExecNext;
-        frst := lst1.Strings[0];
-        scnd := lst1.Strings[1];
+        frst := AnsiQuotedStr(lst1.Strings[0], '"');
+        scnd := AnsiQuotedStr(lst1.Strings[1], '"');
         data_list.Cells[0, i] := lst1.Strings[0];
         data_list.Cells[1, i] := lst1.Strings[1];
         lst1.Clear;
 
         re1.Expression := '\d{4}-\d{2}-\d{2}';  //event's date
         re1.Exec(s);
-        edate := re1.Match[0];
+        edate := AnsiQuotedStr(re1.Match[0], '"');
         data_list.Cells[2, i] := re1.Match[0];
 
         if Pos('/referee/', s) > 0 then //referee*
@@ -264,7 +268,7 @@ begin
             t := Copy(s, Pos('/referee/', s), 200);
             re1.Expression := 'Link">(.*?)</a>';
             re1.Exec(t);
-            refr := re1.Match[1];
+            refr := AnsiQuotedStr(re1.Match[1], '"');
             data_list.Cells[3, i] := re1.Match[1];
           end;
 
@@ -273,7 +277,7 @@ begin
             t := Copy(s, Pos('<b>promoter</b>', s), Pos('footerAd', s) - Pos('<b>promoter</b>', s));
             re1.Expression := 'ter</b>(.*?)</tr>';
             re1.Exec(t);
-            prom := StripTag(re1.Match[1]);
+            prom := AnsiQuotedStr(StripTag(re1.Match[1]), '"');
             data_list.Cells[4, i] := StripTag(re1.Match[1]);
           end;
 
@@ -282,7 +286,7 @@ begin
             t := Copy(s, Pos('<b>matchmaker</b>', s), Pos('footerAd', s) - Pos('<b>matchmaker</b>', s));
             re1.Expression := 'ker</b>(.*?)</tr>';
             re1.Exec(t);
-            mm := StripTag(re1.Match[1]);
+            mm := AnsiQuotedStr(StripTag(re1.Match[1]), '"');
             data_list.Cells[5, i] := StripTag(re1.Match[1]);
           end;
 
@@ -298,16 +302,16 @@ begin
               repeat
                 lst2.Add(re1.Match[1]);
               until not re1.ExecNext;
-            fj := lst2.strings[0];
+            fj := AnsiQuotedStr(lst2.strings[0], '"');
             data_list.Cells[6, i] := lst2.strings[0];
             if CountPos('/judge/', s) > 1 then
               begin
-                sj := lst2.strings[1];
+                sj := AnsiQuotedStr(lst2.strings[1], '"');
                 data_list.Cells[7, i] := lst2.Strings[1];
               end;
             if CountPos('/judge/', s) > 2 then
               begin
-                tj := lst2.strings[2];
+                tj := AnsiQuotedStr(lst2.strings[2], '"');
                 data_list.Cells[8, i] := lst2.Strings[2];
               end;
             lst1.Clear;
@@ -319,8 +323,8 @@ begin
             t := Copy(s, Pos('/venue/', s), Pos('responseLessDataTable', s) - Pos('/venue/', s));
             re1.Expression := '\d{2}">(.*?)<br>';
             re1.Exec(t);
-            loc := Trim(StripTag(re1.Match[1]));
             data_list.Cells[9, i] := Trim(StripTag(re1.Match[1]));
+            loc := AnsiQuotedStr(Trim(StripTag(re1.Match[1])), '"');
           end;
 
         if Pos('<b>last 6</b>', s) > 0 then //1st last 6*
@@ -342,7 +346,7 @@ begin
             lst1.Delimiter := ';';
             data_list.Cells[10, i] := lst1.DelimitedText;
             data_list.Cells[10, i] := StringReplace(data_list.Cells[10, i] , ';', '', [rfReplaceAll, rfIgnoreCase]);
-            fl6 := data_list.Cells[10, i];
+            sl6 := AnsiQuotedStr(StringReplace(data_list.Cells[10, i] , ';', '', [rfReplaceAll, rfIgnoreCase]), '"');
             lst1.Clear;
             re1.Expression := 'left;">(.*?)">';
             if re1.Exec(t) then
@@ -360,7 +364,7 @@ begin
             lst1.Delimiter := ';';
             data_list.Cells[11, i] := lst1.DelimitedText;
             data_list.Cells[11, i] := StringReplace(data_list.Cells[11, i] , ';', '', [rfReplaceAll, rfIgnoreCase]);
-            sl6 := data_list.Cells[11, i];
+            sl6 := AnsiQuotedStr(StringReplace(data_list.Cells[11, i] , ';', '', [rfReplaceAll, rfIgnoreCase]), '"');
             lst1.Clear;
           end;
 
@@ -386,31 +390,31 @@ begin
         re1.Exec(t);
         data_list.Cells[12, i] := Trim(StringReplace(Copy(re1.Match[1], 1, Pos(',', re1.Match[1]) - 1), 'Contest', '', [rfReplaceAll, rfIgnoreCase]));
         data_list.Cells[13, i] := Trim(StringReplace(copy(re1.Match[1], Pos(',', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos(',', re1.Match[1]) + 1), 'Rounds', '', [rfReplaceAll, rfIgnoreCase]));
-        cntst := data_list.Cells[12, i];
-        rnds := data_list.Cells[13, i];
+        cntst := AnsiQuotedStr(Trim(StringReplace(Copy(re1.Match[1], 1, Pos(',', re1.Match[1]) - 1), 'Contest', '', [rfReplaceAll, rfIgnoreCase])), '"');
+        rnds := AnsiQuotedStr(Trim(StringReplace(copy(re1.Match[1], Pos(',', re1.Match[1]) + 1, Length(re1.Match[1]) - Pos(',', re1.Match[1]) + 1), 'Rounds', '', [rfReplaceAll, rfIgnoreCase])), '"');
 
         t := Copy(s, Pos('starBase', s), Pos('<b>ranking</b>', s) - Pos('starBase', s));  //WLD
         t := Copy(t, Pos(data_list.Cells[0, i], t), Pos(data_list.Cells[1, i], t) - Pos(data_list.Cells[0, i], t));
         if Pos('textWon', t) > 0 then
           begin
             data_list.Cells[14, i] := '1';
-            wld := '1';
+            wld := AnsiQuotedStr('1', '"');
           end
         else
           begin
             data_list.Cells[14, i] := '2';
-            wld := '2';
+            wld := AnsiQuotedStr('2', '"');
           end;
 
         if Pos('<br><span class="textDrawn">', s) > 0 then  //text drawn
           begin
             data_list.Cells[14, i] := '0';
-            wld := '0';
+            wld := AnsiQuotedStr('0', '"');
 
             re1.Expression := 'textDrawn">(.*?)</span>';
             re1.Exec(s);
             data_list.Cells[15, i] := re1.Match[1];
-            twon := re1.Match[1];
+            twon := AnsiQuotedStr(re1.Match[1], '"');
           end
         else
           begin
@@ -418,12 +422,12 @@ begin
             re1.Expression := 'Won">(.*?)</span>';
             re1.Exec(t);
             data_list.Cells[15, i] := Trim(StringReplace(re1.Match[1], 'won', '', [rfReplaceAll, rfIgnoreCase]));
-            twon := Trim(StringReplace(re1.Match[1], 'won', '', [rfReplaceAll, rfIgnoreCase]));
+            twon := AnsiQuotedStr(Trim(StringReplace(re1.Match[1], 'won', '', [rfReplaceAll, rfIgnoreCase])), '"');
 
             re1.Expression := '\s<br>(.*?)\n';  //round won
             re1.Exec(t);
             data_list.Cells[16, i] := Trim(StringReplace(re1.Match[1], 'round', '', [rfReplaceAll, rfIgnoreCase]));
-            rwon := Trim(StringReplace(re1.Match[1], 'round', '', [rfReplaceAll, rfIgnoreCase]));
+            rwon := AnsiQuotedStr(Trim(StringReplace(re1.Match[1], 'round', '', [rfReplaceAll, rfIgnoreCase])), '"');
           end;
 
         t := Copy(s, Pos('ranking', s), Pos('details', s) - Pos('ranking', s)); //ranking
@@ -434,7 +438,7 @@ begin
             lst1.Add(re1.Match[1]);
           until not re1.ExecNext;
         data_list.Cells[17, i] := lst1.strings[0];  //ranking
-        fr := lst1.strings[0];
+        fr := AnsiQuotedStr(lst1.strings[0], '"');
         //data_list.Cells[18, i] := lst1.Strings[1];  //points before fight
         //data_list.Cells[19, i] := lst1.Strings[2];  //points after fight
         lst1.Clear;
@@ -445,7 +449,7 @@ begin
             lst1.Add(re1.Match[1]);
           until not re1.ExecNext;
         data_list.Cells[20, i] := lst1.strings[0];  //ranking
-        sr := lst1.strings[0];
+        sr := AnsiQuotedStr(lst1.strings[0], '"');
         //data_list.Cells[21, i] := lst1.Strings[1];  //points before fight
         //data_list.Cells[22, i] := lst1.Strings[2];  //points after fight
         lst1.Clear;
@@ -462,11 +466,11 @@ begin
             re1.Expression := 'right;">(.*?)</td>';  //age 1st fighter
             re1.Exec(t);
             data_list.Cells[23, i] := re1.Match[1];
-            fage := re1.Match[1];
+            fage := AnsiQuotedStr(re1.Match[1], '"');
             re1.Expression := 'left;">(.*?)</td>';  //age 2nd fighter
             re1.Exec(t);
             data_list.Cells[24, i] := re1.Match[1];
-            sage := re1.Match[1];
+            sage := AnsiQuotedStr(re1.Match[1], '"');
           end;
 
         if Pos('<b>stance</b>', s) > 0 then  //stance
@@ -481,11 +485,11 @@ begin
             re1.Expression := 'right;">(.*?)</td>';  //stance 1st fighter
             re1.Exec(t);
             data_list.Cells[25, i] := re1.Match[1];
-            fstnc := re1.Match[1];
+            fstnc := AnsiQuotedStr(re1.Match[1], '"');
             re1.Expression := 'left;">(.*?)</td>';  //stance 2nd fighter
             re1.Exec(t);
             data_list.Cells[26, i] := re1.Match[1];
-            sstnc := re1.Match[1];
+            sstnc := AnsiQuotedStr(re1.Match[1], '"');
           end;
 
         if Pos('<b>height</b>', s) > 0 then  //height
@@ -500,11 +504,11 @@ begin
             re1.Expression := 'right;">(.*?)</td>';  //height 1st fighter
             re1.Exec(t);
             data_list.Cells[27, i] := re1.Match[1];
-            fhgth := re1.Match[1];
+            fhgth := AnsiQuotedStr(re1.Match[1], '"');
             re1.Expression := 'left;">(.*?)</td>';  //height 2nd fighter
             re1.Exec(t);
             data_list.Cells[28, i] := re1.Match[1];
-            shgth := re1.Match[1];
+            shgth := AnsiQuotedStr(re1.Match[1], '"');
           end;
 
         if Pos('<b>reach</b>', s) > 0 then  //reach
@@ -519,11 +523,11 @@ begin
             re1.Expression := 'right;">(.*?)</td>';  //reach 1st fighter
             re1.Exec(t);
             data_list.Cells[29, i] := re1.Match[1];
-            frch := re1.Match[1];
+            frch := AnsiQuotedStr(re1.Match[1], '"');
             re1.Expression := 'left;">(.*?)</td>';  //reach 2nd fighter
             re1.Exec(t);
             data_list.Cells[30, i] := re1.Match[1];
-            srch := re1.Match[1];
+            srch := AnsiQuotedStr(re1.Match[1], '"');
           end;
 
         if Pos('<b>won</b>', s) > 0 then  //won
@@ -538,11 +542,11 @@ begin
             re1.Expression := 'right;" class="textWon">(.*?)</td>';  //won 1st fighter
             re1.Exec(t);
             data_list.Cells[31, i] := re1.Match[1];
-            fwon := re1.Match[1];
+            fwon := AnsiQuotedStr(re1.Match[1], '"');
             re1.Expression := 'left;" class="textWon">(.*?)</td>';  //won 2nd fighter
             re1.Exec(t);
             data_list.Cells[32, i] := re1.Match[1];
-            swon := re1.Match[1];
+            swon := AnsiQuotedStr(re1.Match[1], '"');
           end;
 
         if Pos('<b>lost</b>', s) > 0 then //lost
@@ -551,11 +555,11 @@ begin
             re1.Expression := 'right;" class="textLost">(.*?)</td>';  //lost 1st fighter
             re1.Exec(t);
             data_list.Cells[33, i] := re1.Match[1];
-            flost := re1.Match[1];
+            flost := AnsiQuotedStr(re1.Match[1], '"');
             re1.Expression := 'left;" class="textLost">(.*?)</td>';  //lost 2nd fighter
             re1.Exec(t);
             data_list.Cells[34, i] := re1.Match[1];
-            slost := re1.Match[1];
+            slost := AnsiQuotedStr(re1.Match[1], '"');
           end;
 
         if Pos('<b>drawn</b>', s) > 0 then  //drawn
@@ -564,11 +568,11 @@ begin
             re1.Expression := 'right;" class="textDraw">(.*?)</td>';  //drawn 1st fighter
             re1.Exec(t);
             data_list.Cells[35, i] := re1.Match[1];
-            fdrwn := re1.Match[1];
+            fdrwn := AnsiQuotedStr(re1.Match[1], '"');
             re1.Expression := 'left;" class="textDraw">(.*?)</td>';  //drawn 2nd fighter
             re1.Exec(t);
             data_list.Cells[36, i] := re1.Match[1];
-            sdrwn := re1.Match[1];
+            sdrwn := AnsiQuotedStr(re1.Match[1], '"');
           end;
 
         if Pos('<b>KOs</b>', s) > 0 then  //KOs
@@ -583,11 +587,11 @@ begin
             re1.Expression := 'right;">(.*?)</td>';  //KOs 1st fighter
             re1.Exec(t);
             data_list.Cells[37, i] := re1.Match[1];
-            fko := re1.Match[1];
+            fko := AnsiQuotedStr(re1.Match[1], '"');
             re1.Expression := 'left;">(.*?)</td>';  //KOs 2nd fighter
             re1.Exec(t);
             data_list.Cells[38, i] := re1.Match[1];
-            sko := re1.Match[1];
+            sko := AnsiQuotedStr(re1.Match[1], '"');
           end;
 
           t := Copy(s, Pos('singleColumn', s), Pos('starBase', s) - Pos('singleColumn', s));
@@ -604,7 +608,7 @@ begin
               re1.Expression := '"birthDate">(.*?)</span>';
               re1.Exec(t);
               data_list.Cells[39, i] := re1.Match[1];
-              fbd := re1.Match[1];
+              fbd := AnsiQuotedStr(re1.Match[1], '"');
             end;
 
           if Pos('<b>residence</b>', t) > 0 then //1st residence
@@ -613,7 +617,7 @@ begin
               re1.Expression := '">(.*?)</tr>';
               re1.Exec(u);
               data_list.Cells[41, i] := Trim(StripTag(re1.Match[1]));
-              fres := Trim(StripTag(re1.Match[1]));
+              fres := AnsiQuotedStr(Trim(StripTag(re1.Match[1])), '"');
             end;
 
           if Pos('<b>birth place</b>', t) > 0 then //1st birthplace
@@ -622,7 +626,7 @@ begin
               re1.Expression := '">(.*?)</tr>';
               re1.Exec(u);
               data_list.Cells[43, i] := Trim(StripTag(re1.Match[1]));
-              fbp := Trim(StripTag(re1.Match[1]));
+              fbp := AnsiQuotedStr(Trim(StripTag(re1.Match[1])), '"');
             end;
 
           t := IdHTTP.Get('http://boxrec.com' + lst1.Strings[1]);
@@ -632,7 +636,7 @@ begin
               re1.Expression := '"birthDate">(.*?)</span>';
               re1.Exec(t);
               data_list.Cells[40, i] := re1.Match[1];
-              sbd := re1.Match[1];
+              sbd := AnsiQuotedStr(re1.Match[1], '"');
             end;
 
           if Pos('<b>residence</b>', t) > 0 then //2nd residence
@@ -641,7 +645,7 @@ begin
               re1.Expression := '">(.*?)</tr>';
               re1.Exec(u);
               data_list.Cells[42, i] := Trim(StripTag(re1.Match[1]));
-              sres := Trim(StripTag(re1.Match[1]));
+              sres := AnsiQuotedStr(Trim(StripTag(re1.Match[1])), '"');
             end;
 
           if Pos('<b>birth place</b>', t) > 0 then //2nd birthplace
@@ -650,14 +654,14 @@ begin
               re1.Expression := '">(.*?)</tr>';
               re1.Exec(u);
               data_list.Cells[44, i] := Trim(StripTag(re1.Match[1]));
-              sbp := Trim(StripTag(re1.Match[1]));
+              sbp := AnsiQuotedStr(Trim(StripTag(re1.Match[1])), '"');
             end;
 
-        lst4.Add(frst + ';' + scnd + ';' + edate + ';' + refr + ';' + prom + ';' +mm + ';' + fj + ';' + sj + ';' + tj +
-        ';' + loc + ';' + fl6 + ';' + sl6 + ';' + cntst + ';' + rnds + ';' + wld + ';' + twon + ';' + rwon + ';' + fr +
-        ';' + sr + ';' + fage + ';' + sage + ';' + fstnc + ';' + sstnc + ';' + fhgth + ';' + shgth + ';' + frch + ';' +
-        srch + ';' + fwon + ';' + swon + ';' + flost + ';' + slost + ';' + fdrwn + ';' + sdrwn + ';' + fko + ';' + sko +
-        ';' + fbd + ';' + sbd + ';' + fres + ';' + sres + ';' + fbp + ';' + sbp);
+        u := StringReplace(frst + ',' + scnd + ',' + edate + ',' + refr + ',' + prom + ',' +mm + ',' + fj + ',' + sj + ',' + tj + ',' + loc + ',' + fl6 + ',' + sl6 + ',' + cntst + ',' + rnds + ',' + wld + ',' + twon + ',' + rwon + ',' + fr + ',' + sr + ',' + fage + ',' + sage + ',' + fstnc + ',' + sstnc + ',' + fhgth + ',' + shgth + ',' + frch + ',' + srch + ',' + fwon + ',' + swon + ',' + flost + ',' + slost + ',' + fdrwn + ',' + sdrwn + ',' + fko + ',' + sko + ',' + fbd + ',' + sbd + ',' + fres + ',' + sres + ',' + fbp + ',' + sbp, #13, '', [rfReplaceAll, rfIgnoreCase]);
+        u := StringReplace(frst + ',' + scnd + ',' + edate + ',' + refr + ',' + prom + ',' +mm + ',' + fj + ',' + sj + ',' + tj + ',' + loc + ',' + fl6 + ',' + sl6 + ',' + cntst + ',' + rnds + ',' + wld + ',' + twon + ',' + rwon + ',' + fr + ',' + sr + ',' + fage + ',' + sage + ',' + fstnc + ',' + sstnc + ',' + fhgth + ',' + shgth + ',' + frch + ',' + srch + ',' + fwon + ',' + swon + ',' + flost + ',' + slost + ',' + fdrwn + ',' + sdrwn + ',' + fko + ',' + sko + ',' + fbd + ',' + sbd + ',' + fres + ',' + sres + ',' + fbp + ',' + sbp, #10, '', [rfReplaceAll, rfIgnoreCase]);
+
+        lst4.Add(u);
+        //lst4.Add(StringReplace(frst + ',' + scnd + ',' + edate + ',' + refr + ',' + prom + ',' +mm + ',' + fj + ',' + sj + ',' + tj + ',' + loc + ',' + fl6 + ',' + sl6 + ',' + cntst + ',' + rnds + ',' + wld + ',' + twon + ',' + rwon + ',' + fr + ',' + sr + ',' + fage + ',' + sage + ',' + fstnc + ',' + sstnc + ',' + fhgth + ',' + shgth + ',' + frch + ',' + srch + ',' + fwon + ',' + swon + ',' + flost + ',' + slost + ',' + fdrwn + ',' + sdrwn + ',' + fko + ',' + sko + ',' + fbd + ',' + sbd + ',' + fres + ',' + sres + ',' + fbp + ',' + sbp, #13, '', [rfReplaceAll, rfIgnoreCase]));
 
         lst1.Clear;
 
@@ -670,6 +674,7 @@ begin
       Memo3.Lines.Add(lst3.Strings[i - 1]);
       Continue;
     end;
+
 
 
   SaveToFile;
@@ -1172,4 +1177,3 @@ begin
 end;
 
 end.
-
