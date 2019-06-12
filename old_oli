@@ -1,0 +1,1053 @@
+unit Unit4;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
+  System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, regexpr, Vcl.StdCtrls, Vcl.ComCtrls,
+  Vcl.OleCtrls, SHDocVw, Vcl.Grids, IdBaseComponent, IdComponent,
+  IdTCPConnection, IdTCPClient, IdHTTP, Vcl.ExtCtrls, MSHTML, IdException,
+  StrUtils,
+  IdAntiFreezeBase, Vcl.IdAntiFreeze;
+
+type
+  TForm4 = class(TForm)
+    auth: TWebBrowser;
+    auth_pb: TProgressBar;
+    auth_btn: TButton;
+    history: TWebBrowser;
+    bank: TEdit;
+    matches_line: TStringGrid;
+    Button1: TButton;
+    Memo1: TMemo;
+    IdHTTP1: TIdHTTP;
+    Timer1: TTimer;
+    select_sport_cmbbx: TComboBox;
+    crt2_edt: TEdit;
+    bet: TWebBrowser;
+    crt1_edt: TEdit;
+    bet_values: TStringGrid;
+    bet2: TWebBrowser;
+    Button3: TButton;
+    crt3_edt: TEdit;
+    Timer2: TTimer;
+    bet_list: TMemo;
+    check_list: TMemo;
+    count_1: TEdit;
+    count_check: TEdit;
+    log_list: TMemo;
+    crt4_edt: TEdit;
+    strtg_rg: TRadioGroup;
+    IdHTTP2: TIdHTTP;
+    true_div: TMemo;
+    IdAntiFreeze1: TIdAntiFreeze;
+    Button2: TButton;
+    Button4: TButton;
+    strtg3_list: TMemo;
+    procedure FormCreate(Sender: TObject);
+    procedure authProgressChange(ASender: TObject;
+      Progress, ProgressMax: Integer);
+    procedure auth_btnClick(Sender: TObject);
+    procedure authDocumentComplete(ASender: TObject; const pDisp: IDispatch;
+      const URL: OleVariant);
+    procedure authNavigateComplete2(ASender: TObject; const pDisp: IDispatch;
+      const URL: OleVariant);
+    procedure Button1Click(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    procedure betNavigateComplete2(ASender: TObject; const pDisp: IDispatch;
+      const URL: OleVariant);
+    procedure betDocumentComplete(ASender: TObject; const pDisp: IDispatch;
+      const URL: OleVariant);
+    procedure betNewWindow2(ASender: TObject; var ppDisp: IDispatch;
+      var Cancel: WordBool);
+    procedure Button3Click(Sender: TObject);
+    procedure bet2DocumentComplete(ASender: TObject; const pDisp: IDispatch;
+      const URL: OleVariant);
+    procedure bet2NavigateComplete2(ASender: TObject; const pDisp: IDispatch;
+      const URL: OleVariant);
+    procedure RamClean;
+    procedure Timer2Timer(Sender: TObject);
+    procedure historyDocumentComplete(ASender: TObject; const pDisp: IDispatch;
+      const URL: OleVariant);
+    procedure historyNavigateComplete2(ASender: TObject; const pDisp: IDispatch;
+      const URL: OleVariant);
+    procedure matches_lineDrawCell(Sender: TObject; ACol, ARow: Integer;
+      Rect: TRect; State: TGridDrawState);
+    procedure Button2Click(Sender: TObject);
+    procedure Button4Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  Form4: TForm4;
+  CurDispatch: IDispatch;
+  auth_flag: boolean;
+  bet_flag: boolean;
+  bet_id: string; // код матча
+  bet_code: string; // код события
+  bet_type: string; // тип события
+function SymbolEntersCount(s: string; ch: char): Integer;
+function StripTags(s, f, l: string): string;
+
+implementation
+
+{$R *.dfm}
+
+const // для выключения щелчков при переходах по ссылкам
+  SET_FEATURE_ON_PROCESS = $00000002;
+  FEATURE_DISABLE_NAVIGATION_SOUNDS = 21;
+
+function CoInternetSetFeatureEnabled(FeatureEntry: DWORD;
+  // для выключения щелчков при переходах по ссылкам
+  dwFlags: DWORD; fEnable: BOOL): HRESULT; stdcall; external 'urlmon.dll';
+
+procedure TForm4.FormCreate(Sender: TObject); // загрузка основной формы
+begin
+  Form4.WindowState := wsMaximized;
+  auth_flag := false;
+  with matches_line do
+  begin
+    Cells[0, 0] := 'Матчи';
+    Cells[1, 0] := 'Результат';
+    Cells[2, 0] := 'ID';
+    Cells[3, 0] := 'Период';
+    Cells[4, 0] := '1';
+    Cells[5, 0] := '2';
+    Cells[6, 0] := '3';
+    Cells[7, 0] := '4';
+    Cells[8, 0] := '5';
+    Cells[9, 0] := 'Тотал';
+
+    // Cells[11, 0] := 'Разница';
+    ColWidths[2] := -1;
+    ColWidths[9] := -1;
+  end;
+  with bet_values do
+  begin
+    Cells[0, 0] := 'Дата';
+    Cells[1, 0] := 'Матч';
+    Cells[2, 0] := 'Событие';
+    Cells[3, 0] := 'Кеф';
+    Cells[4, 0] := 'Сумма';
+    Cells[5, 0] := 'Статус';
+    Cells[6, 0] := 'Выплата';
+  end;
+  select_sport_cmbbx.ItemIndex := 3;
+  try
+    auth.Navigate('http://www.olimpkz.com/');
+  except
+    on E: Exception do
+    begin
+      log_list.Lines.Add(TimeToStr(now()) + ' ' + E.message);
+    end;
+  end;
+end;
+
+procedure TForm4.Timer1Timer(Sender: TObject);
+begin
+  Button1Click(Sender);
+end;
+
+procedure TForm4.Timer2Timer(Sender: TObject);
+begin
+  RamClean;
+end;
+
+procedure TForm4.authProgressChange(ASender: TObject;
+  Progress, ProgressMax: Integer);
+begin
+  auth_pb.Max := ProgressMax;
+  auth_pb.Position := Progress;
+end;
+
+procedure TForm4.auth_btnClick(Sender: TObject); // авторизация
+var
+  lgn, psswrd: variant;
+  i: Integer;
+  st: string;
+  auth_doc: IHTMLDocument2;
+begin
+  auth_doc := auth.ControlInterface.Document as IHTMLDocument2;
+  st := auth_doc.body.innerHTML;
+  if pos('Информация о счете', st) = 0 then
+  begin
+    auth_flag := true;
+    lgn := auth.oleobject.Document.getelementbyid('login');
+    lgn.value := '325706';
+    psswrd := auth.oleobject.Document.getelementbyid('passw');
+    psswrd.value := 'Icefrog16486';
+    begin
+      for i := 0 to auth.oleobject.Document.all.tags('input').length - 1 do
+        if (auth.oleobject.Document.all.tags('input').item(i).value = 'Вход')
+        then
+          auth.oleobject.Document.all.tags('input').item(i).click;
+    end;
+  end
+  else
+  begin
+    if bet_flag = true then
+      try
+        bet.Navigate
+          ('https://www.olimpkz.com/index.php?page=line&action=2&live[]='
+          + bet_id);
+      except
+        on E: Exception do
+        begin
+          log_list.Lines.Add(TimeToStr(now()) + ' ' + E.message);
+        end;
+      end;
+  end;
+end;
+
+procedure TForm4.authDocumentComplete(ASender: TObject; const pDisp: IDispatch;
+  // загрузка формы авторизации
+  const URL: OleVariant);
+begin
+  if (pDisp = CurDispatch) then
+  begin
+    Beep;
+    CurDispatch := nil;
+    if auth_flag = true then
+    begin
+      try
+        history.Navigate('https://www.olimpkz.com/index.php?page=history');
+      except
+        on E: Exception do
+        begin
+          log_list.Lines.Add(TimeToStr(now()) + ' ' + E.message);
+        end;
+      end;
+      if bet_flag = true then
+        try
+          bet.Navigate
+            ('https://www.olimpkz.com/index.php?page=line&action=2&live[]='
+            + bet_id);
+        except
+          on E: Exception do
+          begin
+            log_list.Lines.Add(TimeToStr(now()) + ' ' + E.message);
+          end;
+        end;
+    end
+    else
+      Timer1.Enabled := true;
+  end;
+end;
+
+procedure TForm4.authNavigateComplete2(ASender: TObject; const pDisp: IDispatch;
+  // загрузка формы авторизации
+  const URL: OleVariant);
+begin
+  if CurDispatch = nil then
+    CurDispatch := pDisp;
+end;
+
+procedure TForm4.Button1Click(Sender: TObject);
+// загрузка списка матчей в таблицу
+var
+  main_shbln: TRegExpr;
+  lst, lst2, lst3: tstringlist;
+  st, fp, lp, st2, st3: string;
+  i, j, k, l: Integer;
+
+begin
+
+  Memo1.Clear;
+  { begin
+    for i:=0 to matches_line.ColCount-10 do
+    for j:=1 to matches_line.RowCount-1 do
+    matches_line.Cells[i,j] := '';
+    end; }
+
+  begin // очистка всей таблицы
+    with matches_line do
+      for i := FixedRows to RowCount - 1 do
+        Rows[i].Clear;
+  end;
+
+  IdHTTP1.Disconnect;
+  IdHTTP1.Request.Host := 'olimpkz.com';
+  IdHTTP1.Request.Connection := 'keep-alive';
+  IdHTTP1.Request.Accept :=
+    'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 ';
+  IdHTTP1.Request.UserAgent :=
+    'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.102 Safari/537.36';
+  IdHTTP1.Request.AcceptLanguage := 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3';
+  IdHTTP1.Request.Referer := 'https://www.olimpkz.com/';
+  try
+    try
+      st := IdHTTP1.Get('http://www.olimpkz.com/betting');
+    except
+      on E: EIdConnClosedGracefully do
+      begin
+        log_list.Lines.Add(TimeToStr(now()) + ' ' + E.message);
+      end;
+      on E: EIdException do
+      begin
+        log_list.Lines.Add(TimeToStr(now()) + ' ' + E.message);
+      end;
+    end;
+  finally
+    IdHTTP1.Disconnect;
+  end;
+
+////////////////// OLIMP ///////////////////////////////////////////////////////
+
+  st := copy(st, pos('<b>' + select_sport_cmbbx.Text + '</b>', st),
+    pos('Включить нумерацию матчей в линии', st) -
+    pos('<b>' + select_sport_cmbbx.Text + '</b>', st));
+  st := copy(st, pos('<b>' + select_sport_cmbbx.Text + '</b>', st),
+    pos('var ', st) - pos('<b>' + select_sport_cmbbx.Text + '</b>', st));
+
+  lst := tstringlist.Create;
+
+  main_shbln := TRegExpr.Create; // для результата
+  main_shbln.Expression :=
+    '<font class="txtmed" style="color:red;">(.*?)</font>';
+  if main_shbln.Exec(st) then
+    repeat
+      lst.Add(main_shbln.Match[1]);
+    until not main_shbln.ExecNext;
+
+  for i := 0 to lst.Count - 1 do
+    matches_line.Cells[1, i + 1] := lst.Strings[i];
+  lst.Clear;
+
+  //st := copy(st, pos('<a href=', st), pos('<script', st)); // для матчей
+
+  //st := StringReplace(st, '<font class="txtmed" style="color:red;">', '',
+  //  [rfReplaceAll, rfIgnoreCase]);
+
+  {lst.Text := st;
+  begin
+    for i := lst.Count - 1 downto 0 do
+      if (pos('input', lst.Strings[i]) > 0) or (pos('<td', lst.Strings[i]) > 0) or (Length(trim(lst.Strings[i])) = 0)
+      then
+        lst.Delete(i);
+  end;
+
+  st := lst.Text;}
+  //st := StringReplace(st, #13#10, '',
+  //  [rfReplaceAll, rfIgnoreCase]);
+  //st := trim(st);
+  st := StringReplace(st, '"><', '',
+    [rfReplaceAll, rfIgnoreCase]);
+
+  log_list.Text:=st;
+
+  lst.Clear;
+
+  main_shbln.Expression := '[0-9]">(.*?)<';
+  if main_shbln.Exec(st) then
+    repeat
+      lst.Add(main_shbln.Match[1]);
+    until not main_shbln.ExecNext;
+  for i := 0 to lst.Count - 1 do
+  begin
+    matches_line.Cells[0, i + 1] := Trim(lst.Strings[i]);
+    matches_line.Cells[0, i + 1] := StringReplace(matches_line.Cells[0, i + 1],
+      '>', '', [rfReplaceAll, rfIgnoreCase]);
+  end;
+  lst.Clear;
+
+  main_shbln.Expression := 'live\[\]=(.*?)">'; // для кодов
+  if main_shbln.Exec(st) then
+    repeat
+      lst.Add(main_shbln.Match[1]);
+    until not main_shbln.ExecNext;
+  for i := 0 to lst.Count - 1 do
+  begin
+    matches_line.Cells[2, i + 1] := lst.Strings[i];
+  end;
+  lst.Clear;
+  lst.Free;
+  main_shbln.Free;
+
+////////////////////////////////////////////////////////////////////////////////
+
+  begin // подсчёт количества непустых строк
+    j := 0;
+    for i := 1 to matches_line.RowCount do
+    begin
+      if length(matches_line.Cells[0, i]) > 1 then
+        Inc(j);
+    end;
+  end;
+
+  case select_sport_cmbbx.ItemIndex of
+    1:
+      begin
+        Timer1.Enabled := false;
+        showmessage('Футбол');
+      end
+
+  else
+
+    begin
+      for i := 1 to j do
+      begin
+        matches_line.Cells[3, i] :=
+          inttostr(SymbolEntersCount(matches_line.Cells[1, i], ',') + 1);
+      end;
+    end;
+
+    begin
+      fp := '(';
+      lp := ')';
+      for i := 1 to j do
+      begin
+        matches_line.Cells[9, i] := copy(matches_line.Cells[1, i],
+          pos(fp, matches_line.Cells[1, i]) + length(fp),
+          pos(lp, matches_line.Cells[1, i]) - pos(fp, matches_line.Cells[1, i])
+          - length(fp));
+        matches_line.Cells[9, i] := StringReplace(matches_line.Cells[9, i], '(',
+          '', [rfReplaceAll, rfIgnoreCase]);
+        matches_line.Cells[9, i] := StringReplace(matches_line.Cells[9, i], ')',
+          '', [rfReplaceAll, rfIgnoreCase]);
+      end;
+    end;
+
+    begin // тоталы по столбцам
+      lst2 := tstringlist.Create;
+      lst3 := tstringlist.Create;
+      for i := 1 to j do
+      begin
+        if (pos('Матч', matches_line.Cells[1, i]) > 0) or
+          (pos('Медиц', matches_line.Cells[1, i]) > 0) or
+          (pos('Счет ОТ', matches_line.Cells[1, i]) > 0) or
+          (pos('Игра приостановлена', matches_line.Cells[1, i]) > 0) or
+          (pos('(', matches_line.Cells[1, i]) = 0) then
+        begin
+          matches_line.Cells[11, i] := '';
+          matches_line.Cells[12, i] := '';
+          matches_line.Cells[13, i] := '';
+          continue; // если матч не начался, завершен или пауза в игре, то пропускаем его
+        end
+        else
+        begin
+          ExtractStrings([','], [' '], PChar(matches_line.Cells[9, i]), lst2);
+          for k := 4 to 3 + StrToInt(matches_line.Cells[3, i]) do
+          begin
+            ExtractStrings([':'], [], PChar(lst2.Strings[k - 4]), lst3);
+            matches_line.Cells[k, i] :=
+              inttostr(StrToInt(lst3.Strings[0]) + StrToInt(lst3.Strings[1]));
+            lst3.Clear;
+          end;
+        end;
+
+        case strtg_rg.ItemIndex of
+          0:
+            begin
+              ExtractStrings([':'], [],
+                PChar(lst2.Strings[StrToInt(matches_line.Cells[3, i]) - 1]),
+                lst3); // поиск нужных матчей
+              if pos(matches_line.Cells[2, i], bet_list.Lines.Text) = 0 then
+                if length(matches_line.Cells
+                  [4 - 2 + StrToInt(matches_line.Cells[3, i]), i]) > 0 then
+                  // если тотал предыдущего периода больше 0
+                  if (StrToInt(matches_line.Cells[3, i]) < 5) And
+                    (StrToInt(matches_line.Cells[3, i]) > 1) then
+                    // если текущий период больше 1 и меньше 5
+                    if StrToInt
+                      (matches_line.Cells[4 - 2 + StrToInt(matches_line.Cells[3,
+                      i]), i]) >= StrToInt(crt1_edt.Text) then
+                      // если тотал предыдущего периода равно или больше
+                      if (StrToInt(lst3.Strings[0]) < StrToInt(crt2_edt.Text))
+                        And (StrToInt(lst3.Strings[1]) < StrToInt(crt2_edt.Text))
+                      then // если очки обеих команд меньше 20)
+                        if (StrToInt(lst3.Strings[0]) >= StrToInt(crt4_edt.Text)
+                          ) And (StrToInt(lst3.Strings[1]) >=
+                          StrToInt(crt4_edt.Text)) then
+                          // если очки обеих команд больше 10)
+                          matches_line.Cells[11, i] := '1';
+            end;
+
+          1:
+            begin
+              if pos(matches_line.Cells[2, i], bet_list.Lines.Text) = 0 then
+                if matches_line.Cells[3, i] = '3' then
+                  // если текущий период равен 3
+                  if (StrToInt(matches_line.Cells[4, i]) +
+                    StrToInt(matches_line.Cells[5, i]) >= 90) and
+                    (StrToInt(matches_line.Cells[4, i]) +
+                    StrToInt(matches_line.Cells[5, i]) < 98) then
+                    matches_line.Cells[11, i] := '1';
+            end;
+
+          2:
+            begin
+              with matches_line do
+              // прописываем шапки вспомогательных столбцов для стратегии
+              begin
+                Cells[10, 0] := 'Условие';
+                Cells[11, 0] := 'Начальный кэф';
+                Cells[12, 0] := 'Период кэфа';
+                Cells[13, 0] := 'Текущий кэф';
+              end;
+
+              IdHTTP2.Request.Host := 'olimpkz.com';
+              IdHTTP2.Request.Connection := 'keep-alive';
+              IdHTTP2.Request.Accept :=
+                'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 ';
+              IdHTTP2.Request.UserAgent :=
+                'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.102 Safari/537.36';
+              // маскируем Indy под браузер
+              IdHTTP2.Request.AcceptLanguage :=
+                'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3';
+              IdHTTP2.Request.Referer := 'https://www.olimpkz.com/';
+
+              try
+                try
+                  st := IdHTTP2.Get
+                    ('http://www.olimpkz.com/index.php?page=line&action=2&live[]='
+                    + matches_line.Cells[2, i]);
+                except
+                  on E: EIdConnClosedGracefully do
+                  begin
+                    log_list.Lines.Add(TimeToStr(now()) + ' ' + E.message);
+                  end;
+                  on E: EIdException do
+                  begin
+                    log_list.Lines.Add(TimeToStr(now()) + ' ' + E.message);
+                  end;
+                end;
+              finally
+                IdHTTP1.Disconnect;
+              end;
+
+              if (pos('Прием ставок приостановлен', st) > 0) then
+              // если приостановлен или
+              // ((matches_line.Cells[11, i] <> '') And            //
+              // (matches_line.Cells[12, i] <> '')) //Or           //
+              // (pos('Тотал ' + inttostr(StrToInt(matches_line.Cells[3, i]) +
+              // 1), st) = 0)
+              begin
+                lst3.Clear; // очищаем
+                lst2.Clear; // списки
+                continue; // следующая итерация
+              end
+              else
+
+                st2 := copy(st, //
+                  pos('Тотал ' + inttostr(StrToInt(matches_line.Cells[3, i])),
+                  // грабим
+                  st), pos('function ajax', st) - // кэф
+                  pos('Тотал ' + inttostr(StrToInt(matches_line.Cells[3, i])),
+                  st)); // на
+              st2 := copy(st2, pos('Тотал ', st2),
+                pos('мен', st2) - pos('Тотал ', st2)); // тотал
+              if (pos('половин', st2) > 0) or (pos('function', st2) > 0) then
+                matches_line.Cells[13, i] := ''
+              else
+              begin
+                st2 := copy(st2, pos('(', st2) + 1,
+                  pos(')', st2) - pos('(', st2) - 1); // текущего
+                st2 := StringReplace(st2, '.', ',',
+                  [rfReplaceAll, rfIgnoreCase]);
+                // периода
+                matches_line.Cells[13, i] := st2; //
+              end;
+
+              st3 := copy(st, //
+                pos('Тотал ' + inttostr(StrToInt(matches_line.Cells[3, i]) + 1),
+                // начальный
+                st), pos('function ajax', st) - // кэф
+                pos('Тотал ' + inttostr(StrToInt(matches_line.Cells[3, i]) + 1),
+                st)); // на тотал
+              st3 := copy(st3, pos('Тотал ', st3),
+                pos('мен', st3) - pos('Тотал ', st3)); // следующего/нового
+              st3 := copy(st3, pos('(', st3) + 1, pos(')', st3) - pos('(', st3)
+                - 1); // периода
+              st3 := StringReplace(st3, '.', ',', [rfReplaceAll, rfIgnoreCase]);
+              //
+              // matches_line.Cells[11, i] := st3;
+              // matches_line.Cells[12, i] := inttostr(StrToInt(matches_line.Cells[3, i]) + 1);
+              if pos('половин', st3) = 0 then
+                if pos('function', st3) = 0 then
+                  if pos(matches_line.Cells[2, i] + '_' + matches_line.Cells[3, i],
+                    strtg3_list.Text) = 0 then
+                    // если этот кэф этого матча этого периода еще нет в списке
+                    if st3 <> '' then // если начальный кэф не пустой
+                      strtg3_list.Lines.Add(matches_line.Cells[2, i] + '_' +
+                        matches_line.Cells[3, i] + '_' + st3);
+              // добавляем его в наш список
+
+              for l := true_div.Lines.Count - 1 downto 0 do
+                if pos(true_div.Lines[l], st) > 0 then
+                  matches_line.Cells[10, i] := '1';
+            end;
+        end;
+
+        lst3.Clear;
+        lst2.Clear;
+      end;
+      lst2.Free;
+      lst3.Free;
+    end;
+
+    begin // подсчет количества подходящих ставок
+      k := 0;
+      for i := 1 to j do
+      begin
+        if matches_line.Cells[10, i] = '1' then
+        begin
+          k := k + 1;
+        end;
+      end;
+      count_1.Text := inttostr(k);
+    end;
+
+    begin
+      count_check.Text := inttostr(check_list.Lines.Count);
+      if count_check.Text = count_1.Text then
+        check_list.Clear;
+      // если количество подходящих ставко равно количеству в локальном списке, то очищаем локальный список
+    end;
+
+    { begin
+      for i := 1 to j do
+      begin
+      if matches_line.Cells[10, i] = '1' then
+      begin
+      if pos(matches_line.Cells[2, i] + '_' + matches_line.Cells[3, i], check_list.Lines.Text) <> 0 then
+      continue
+      else
+      Timer1.Enabled := false;
+      bet_flag := true;
+      bet_id := matches_line.Cells[2, i];
+      auth_btnClick(Sender);
+      check_list.Lines.Add(matches_line.Cells[2, i] + '_' + matches_line.Cells[3, i]);
+      Break;
+      end;
+      end;
+      end; }
+
+  end;
+
+end;
+
+procedure TForm4.Button2Click(Sender: TObject);
+begin
+  Timer1.Enabled := false;
+end;
+
+procedure TForm4.betDocumentComplete(ASender: TObject; const pDisp: IDispatch;
+  const URL: OleVariant);
+var
+  bet_doc: IHTMLDocument2;
+  st: string;
+  i, k: Integer;
+begin
+  if (pDisp = CurDispatch) then
+  begin
+    Beep;
+    CurDispatch := nil;
+    begin
+      try
+        begin
+          bet_doc := bet.ControlInterface.Document as IHTMLDocument2;
+          st := bet_doc.body.innerHTML;
+        end;
+      except
+        begin
+          bet_id := '';
+          Timer1.Enabled := true;
+          exit;
+        end;
+      end;
+
+      bet_type := 'партии (' + crt3_edt.Text + ') мен';
+
+      if pos('Прием ставок приостановлен', st) > 0 then
+      // если прием ставок приостановлен, то ничего не делаем
+      begin
+        bet.oleobject.Document.write('');
+        bet.Refresh;
+
+        { begin
+          for i := 0 to check_list.Lines.Count - 1 do
+          if pos(bet_id, check_list.Lines[i]) > 0 then
+          if check_list.Lines.Count > 1 then check_list.Lines.Delete(i - 1);
+          end; }
+        bet_id := '';
+        Timer1.Enabled := true;
+        Application.ProcessMessages;
+      end
+      else if pos(bet_type, st) = 0 then // если кефа нет, то ничего не делаем
+      begin
+        bet.oleobject.Document.write('');
+        bet.Refresh;
+
+        { begin
+          for i := 0 to check_list.Lines.Count - 1 do
+          if pos(bet_id, check_list.Lines[i]) > 0 then
+          if check_list.Lines.Count > 1 then check_list.Lines.Delete(i - 1);
+          end; }
+        bet_id := '';
+        Timer1.Enabled := true;
+        Application.ProcessMessages;
+      end
+      else
+
+      begin
+
+        st := copy(st, pos('Оглавление', st) + length('Оглавление'),
+          pos('function ajax', st) - pos('Оглавление', st) -
+          length('Оглавление') + length('function ajax'));
+        st := copy(st, pos(bet_type, st) + length(bet_type),
+          pos('function ajax', st) - pos(bet_type, st) - length(bet_type) +
+          length('function ajax'));
+        st := StripTags(st, '', ''); // удаляем все теги img
+        st := Trim(copy(st, pos('value=', st) + length('value='),
+          pos('type=radio', st) - pos('value=', st) - length('value=')));
+
+        Memo1.Text := st;
+        bet_code := st;
+
+        begin
+          for i := 0 to bet.oleobject.Document.all.tags('input').length - 1 do
+          begin
+            if (bet.oleobject.Document.all.tags('input').item(i)
+              .value = bet_code) then
+            begin
+              bet.oleobject.Document.all.tags('input').item(i).click;
+              for k := 0 to bet.oleobject.Document.all.tags('input')
+                .length - 1 do
+              begin
+                if (bet.oleobject.Document.all.tags('input').item(k)
+                  .value = 'Ставка') then
+                  bet.oleobject.Document.all.tags('input').item(k).click;
+              end;
+              bet.Refresh;
+            end;
+          end;
+        end;
+
+      end;
+
+    end;
+  end;
+end;
+
+procedure TForm4.betNavigateComplete2(ASender: TObject; const pDisp: IDispatch;
+  const URL: OleVariant);
+begin
+  if CurDispatch = nil then
+    CurDispatch := pDisp;
+end;
+
+procedure TForm4.betNewWindow2(ASender: TObject; var ppDisp: IDispatch;
+  var Cancel: WordBool);
+begin
+  ppDisp := Form4.bet2.DefaultDispatch;
+end;
+
+procedure TForm4.bet2DocumentComplete(ASender: TObject; const pDisp: IDispatch;
+  const URL: OleVariant);
+var
+  bet2_doc: IHTMLDocument2;
+  bet_sum: variant;
+  st: string;
+  i: Integer;
+begin
+  if (pDisp = CurDispatch) then
+  begin
+    Beep;
+    CurDispatch := nil;
+    begin
+      /// //////////////////////////////////////////
+      bet2_doc := bet2.ControlInterface.Document as IHTMLDocument2;
+      st := bet2_doc.body.innerHTML;
+
+      if pos(bet_type, st) > 0 then
+      begin
+        bet_sum := bet2.oleobject.Document.getelementbyid('sb0');
+        bet_sum.value := FloatToStr(StrToInt(bank.Text) * 0.05);
+        for i := 0 to bet2.oleobject.Document.all.tags('input').length - 1 do
+        begin
+          if (bet2.oleobject.Document.all.tags('input').item(i)
+            .value = 'Сделать ставку') then
+            bet2.oleobject.Document.all.tags('input').item(i).click;
+        end;
+      end
+      else if pos('Не выбран ни один исход!', st) > 0 then
+      begin
+        bet.oleobject.Document.write('');
+        bet.Refresh;
+        bet2.oleobject.Document.write('');
+        bet2.Refresh;
+        bet_id := '';
+        Timer1.Enabled := true;
+        Application.ProcessMessages;
+      end
+      else if pos('Сменился коэффициент', st) > 0 then
+      begin
+        if pos(bet_type, st) > 0 then
+        begin
+          bet_sum := bet2.oleobject.Document.getelementbyid('sb0');
+          bet_sum.value := FloatToStr(StrToInt(bank.Text) * 0.05);
+          for i := 0 to bet2.oleobject.Document.all.tags('input').length - 1 do
+          begin
+            if (bet2.oleobject.Document.all.tags('input').item(i)
+              .value = 'Сделать ставку') then
+              bet2.oleobject.Document.all.tags('input').item(i).click;
+          end;
+        end
+        else
+        begin
+          bet.oleobject.Document.write('');
+          bet.Refresh;
+          bet2.oleobject.Document.write('');
+          bet2.Refresh;
+          bet_id := '';
+          Timer1.Enabled := true;
+          Application.ProcessMessages;
+        end;
+      end
+      else if pos('Ваша ставка успешно принята', st) > 0 then
+      begin
+        bet_list.Lines.Add(bet_id);
+        log_list.Lines.Add(TimeToStr(now()) + ' ' + bet_id);
+        bet.oleobject.Document.write('');
+        bet.Refresh;
+        bet2.oleobject.Document.write('');
+        bet2.Refresh;
+        history.Navigate('https://www.olimpkz.com/index.php?page=history');
+        bet_id := '';
+        Timer1.Enabled := true;
+        Application.ProcessMessages;
+      end
+      else
+      begin
+        bet.oleobject.Document.write('');
+        bet.Refresh;
+        bet2.oleobject.Document.write('');
+        bet2.Refresh;
+        bet_id := '';
+        Timer1.Enabled := true;
+        Application.ProcessMessages;
+      end;
+    end;
+  end;
+end;
+
+procedure TForm4.bet2NavigateComplete2(ASender: TObject; const pDisp: IDispatch;
+  const URL: OleVariant);
+begin
+  if CurDispatch = nil then
+    CurDispatch := pDisp;
+end;
+
+procedure TForm4.historyDocumentComplete(ASender: TObject;
+  const pDisp: IDispatch; const URL: OleVariant);
+
+var
+  bank_doc, bank_elem: OleVariant;
+
+begin
+  if (pDisp = CurDispatch) then
+  begin
+    Beep;
+    CurDispatch := nil;
+    begin
+      bank_doc := history.oleobject.Document;
+      bank_elem := bank_doc.getelementbyid('currusum');
+      bank.Text := bank_elem.innerHTML;
+      bank.Text := StringReplace(bank.Text, '''', '',
+        [rfReplaceAll, rfIgnoreCase]);
+    end;
+  end;
+end;
+
+procedure TForm4.historyNavigateComplete2(ASender: TObject;
+  const pDisp: IDispatch; const URL: OleVariant);
+begin
+  if CurDispatch = nil then
+    CurDispatch := pDisp;
+end;
+
+procedure TForm4.Button3Click(Sender: TObject);
+var
+  history_doc: IHTMLDocument2;
+  st: string;
+  i: Integer;
+  main_shbln: TRegExpr;
+  lst: tstringlist;
+
+begin
+  history_doc := history.Document as IHTMLDocument2;
+  st := history_doc.body.innerHTML;
+  st := copy(st, pos('Валюта расчетов:', st), pos('Страница:', st) -
+    pos('Валюта расчетов:', st));
+  Memo1.Text := st;
+  begin
+    lst := tstringlist.Create;
+    main_shbln := TRegExpr.Create;
+
+    main_shbln.Expression := '<TD class=txtmed>(.*?)</TD>'; // для дат
+    if main_shbln.Exec(st) then
+      repeat
+        lst.Add(main_shbln.Match[1]);
+      until not main_shbln.ExecNext;
+    for i := 0 to lst.Count - 1 do
+      bet_values.Cells[0, i + 1] := Trim(lst.Strings[i]);
+    lst.Clear;
+  end;
+
+  begin
+    main_shbln.Expression := 'blank>(.*?)</A>'; // для матчей
+    if main_shbln.Exec(st) then
+      repeat
+        lst.Add(main_shbln.Match[1]);
+      until not main_shbln.ExecNext;
+    for i := 0 to lst.Count - 1 do
+      bet_values.Cells[1, i + 1] := Trim(lst.Strings[i]);
+    lst.Clear;
+  end;
+
+  begin
+    main_shbln.Expression := ': <BR>(.*?)</TD>'; // для событий
+    if main_shbln.Exec(st) then
+      repeat
+        lst.Add(main_shbln.Match[1]);
+      until not main_shbln.ExecNext;
+    for i := 0 to lst.Count - 1 do
+      bet_values.Cells[2, i + 1] := Trim(lst.Strings[i]);
+    lst.Clear;
+  end;
+
+  begin
+    main_shbln.Expression := '<TD align=center>(.*?)</TD>'; // для кефов
+    if main_shbln.Exec(st) then
+      repeat
+        lst.Add(main_shbln.Match[1]);
+      until not main_shbln.ExecNext;
+    for i := 0 to lst.Count - 1 do
+      bet_values.Cells[3, i + 1] := Trim(lst.Strings[i]);
+    lst.Clear;
+  end;
+
+  begin
+    main_shbln.Expression := '<TD><B>-(.*?)</B>'; // для сумм
+    if main_shbln.Exec(st) then
+      repeat
+        lst.Add(main_shbln.Match[1]);
+      until not main_shbln.ExecNext;
+    for i := 0 to lst.Count - 1 do
+      bet_values.Cells[4, i + 1] := Trim(lst.Strings[i]);
+    lst.Clear;
+  end;
+
+  begin
+    main_shbln.Expression := '<TD class=[w|l]>(.*?)</TD>'; // для статусов
+    if main_shbln.Exec(st) then
+      repeat
+        lst.Add(main_shbln.Match[1]);
+      until not main_shbln.ExecNext;
+    for i := 0 to lst.Count - 1 do
+      bet_values.Cells[5, i + 1] := Trim(lst.Strings[i]);
+    lst.Clear;
+  end;
+
+  begin
+    main_shbln.Expression := 'Выплата: (.*?)</I>'; // для выплат
+    if main_shbln.Exec(st) then
+      repeat
+        lst.Add(main_shbln.Match[1]);
+      until not main_shbln.ExecNext;
+    for i := 0 to lst.Count - 1 do
+      bet_values.Cells[6, i + 1] := Trim(lst.Strings[i]);
+    lst.Clear;
+  end;
+
+  lst.Free;
+  main_shbln.Free;
+
+end;
+
+procedure TForm4.Button4Click(Sender: TObject);
+begin
+  Application.Terminate;
+end;
+
+procedure TForm4.matches_lineDrawCell(Sender: TObject; ACol, ARow: Integer;
+  // закрашиваем в зелёный цвет нужный период
+  Rect: TRect; State: TGridDrawState);
+const
+  clPaleGreen = TColor($CCFFCC);
+  clPaleRed = TColor($CCCCFF);
+var
+  Text: string;
+begin
+  if (ACol > 2) And (ACol < 8) And (ARow > 0) then
+  begin
+    if matches_line.Cells[ACol, ARow] <> '' then
+      if StrToInt(matches_line.Cells[ACol, ARow]) >= StrToInt(crt1_edt.Text)
+      then
+        matches_line.Canvas.Brush.color := clPaleGreen;
+    begin
+      Text := matches_line.Cells[ACol, ARow];
+      with matches_line do
+      begin
+        Canvas.FillRect(CellRect(ACol, ARow));
+        Canvas.TextOut(Rect.left + ((Rect.Right - Rect.left) div 2) -
+          (Canvas.TextWidth(matches_line.Cells[ACol, ARow]) div 2) - 2,
+          Rect.Top + 2, matches_line.Cells[ACol, ARow]);
+        // тоже подходит DrawText(matches_line.Canvas.Handle, PChar(text), Length(text), Rect, DT_CENTER or DT_VCENTER or DT_SINGLELINE);
+      end;
+    end;
+  end;
+end;
+
+function SymbolEntersCount(s: string; ch: char): Integer;
+// функция подсчёта количества символов
+var
+  i: Integer;
+
+begin
+  Result := 0;
+  if Trim(s) <> '' then
+    for i := 1 to length(s) do
+      if s[i] = ch then
+        Inc(Result);
+end;
+
+function StripTags(s, f, l: string): string; // удаляем теги
+var
+  TagBegin, TagEnd, TagLength: Integer;
+
+begin
+  TagBegin := pos(f, s);
+  while (TagBegin > 0) do
+  begin
+    TagEnd := pos(l, s);
+    TagLength := TagEnd - TagBegin + length(l);
+    Delete(s, TagBegin, TagLength);
+    TagBegin := pos(f, s);
+  end;
+  Result := s;
+end;
+
+procedure TForm4.RamClean;
+var
+  MainHandle: THandle;
+
+begin
+  if Win32Platform = VER_PLATFORM_WIN32_NT then
+  begin
+    MainHandle := OpenProcess(PROCESS_ALL_ACCESS, false, GetCurrentProcessID);
+    SetProcessWorkingSetSize(MainHandle, DWORD(-1), DWORD(-1));
+    CloseHandle(MainHandle);
+  end;
+end;
+
+initialization // для выключения щелчков при переходах по ссылкам
+
+CoInternetSetFeatureEnabled(FEATURE_DISABLE_NAVIGATION_SOUNDS,
+  SET_FEATURE_ON_PROCESS, true);
+
+end.
