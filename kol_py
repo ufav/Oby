@@ -1,17 +1,31 @@
+import ssl
 import requests
 import re
+from requests.adapters import HTTPAdapter, PoolManager
 
-url = 'https://m.kolesa.kz/cars/toyota/matrix/?auto-emergency=1&sort_by=price-asc&year[from]=2004'
-hdr = {'X-Requested-With': 'XMLHttpRequest'}
-flag = True
-i = 1
+
+class MyAdapter(HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False):
+        self.poolmanager = PoolManager(num_pools=connections,
+                                       maxsize=maxsize,
+                                       block=block,
+                                       ssl_version=ssl.PROTOCOL_TLSv1_2)
+
+
 lst1 = []
 lst2 = []
+flag = True
+i = 1
+url = "https://m.kolesa.kz/cars/toyota/matrix/?auto-emergency=1&year[from]=2004&sort_by=price-asc"
+hdr = {'X-Requested-With': 'XMLHttpRequest'}
+
+r = requests.Session()
+r.mount('https://', MyAdapter())
 
 while flag is True:
     try:
-        s = requests.get(url + '&page=' + str(i))
-        lst1.extend(re.findall(r'advert-(.*?)\">', s.text))
+        s = r.get(url + '&page=' + str(i))
+        lst1.extend(re.findall(r'advert-(.*?)"', s.text))
         i += 1
         if s.text.find('advert-') == -1:
             flag = False
@@ -22,8 +36,17 @@ lst1 = list(set(lst1))
 
 for i in lst1:
     try:
-        s = requests.get('http://kolesa.kz/a/ajaxPhones/?id=' + i, headers=hdr)
-        lst2.extend(re.findall(r'\+(.*?)[\"|\\|<|\,]', s.text))
+        city = r.get('https://m.kolesa.kz/a/show/' + i, headers=hdr)
+        city = city.text[city.text.find('Город', 0) + 5:city.text.find('Кузов', 0)]
+        city = re.findall(r'<div>(.*?)</div>', city)
+        phone = r.get('https://kolesa.kz/a/ajaxPhones/?id=' + i, headers=hdr)
+        phone = re.findall(r'\+(.*?)[\\|\"|<]', phone.text.replace(' ', ''))
+        name = r.get('https://m.kolesa.kz/a/comments/' + i, headers=hdr)
+        if 'lft-bl gr' in name.text:
+            name = re.findall(r'bl gr">(.*?)</div', name.text)
+        else:
+            name = 'no data'
+        lst2.extend([city + name + phone])
     except Exception:
         continue
 print(lst2)
