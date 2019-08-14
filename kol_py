@@ -2,6 +2,11 @@ import ssl
 import requests
 import re
 from requests.adapters import HTTPAdapter, PoolManager
+from bs4 import BeautifulSoup
+
+
+base_url = 'https://m.kolesa.kz/cars/toyota/?year[from]=2004&auto-emergency=1'
+hdr = {'X-Requested-With': 'XMLHttpRequest'}
 
 
 class MyAdapter(HTTPAdapter):
@@ -12,49 +17,73 @@ class MyAdapter(HTTPAdapter):
                                        ssl_version=ssl.PROTOCOL_TLSv1_2)
 
 
-lst1 = []
-lst2 = []
-flag = True
-i = 1
-url = "https://m.kolesa.kz/cars/toyota/matrix/?auto-emergency=1&year[from]=2004&sort_by=price-asc"
-hdr = {'X-Requested-With': 'XMLHttpRequest'}
+def get_html(url):
+    r = requests.Session()
+    r.mount('https://', MyAdapter())
+    response = r.get(url, headers=hdr)
+    return response.text
 
-r = requests.Session()
-r.mount('https://', MyAdapter())
 
-while flag is True:
-    try:
-        s = r.get(url + '&page=' + str(i))
-        lst1.extend(re.findall(r'advert-(.*?)"', s.text))
-        i += 1
-        if s.text.find('advert-') == -1:
-            flag = False
-    except Exception:
-        i += 1
-        continue
-lst1 = sorted(list(set(lst1)))
+def page_count(html):
+    lst3 = []
+    soup = BeautifulSoup(html, 'html.parser')
+    last_page = soup.find('div', class_='holder-select')
+    last_page = last_page.find_all('select')[0]
+    last_page = last_page.find_all('option')[-1]['value']
+    return last_page
 
-for i in lst1:
-    try:
-        city = r.get('https://m.kolesa.kz/a/show/' + i, headers=hdr)
-        city = city.text[city.text.find('Город', 0) + 5:city.text.find('Кузов', 0)]
-        city = re.findall(r'<div>(.*?)</div>', city)[0]
+    #return last_page.find_all('option').text
+    #return int(last_page.find_all('option')[-1].text)
 
-        phone = r.get('https://kolesa.kz/a/ajaxPhones/?id=' + i, headers=hdr)
-        phone = phone.json()['data']['model']['phone']
-        phone = phone.replace(' ', '')
-        phone = phone.replace('+7', '')
-        phone = phone.split(',')
-        # phone = re.findall(r'"\+(.*?)[\\|\"|<]', phone.text.replace('+', ''))
-        #name = r.get('https://m.kolesa.kz/a/comments/' + i, headers=hdr)
-        #if 'lft-bl gr' in name.text:
-        #    name = re.findall(r'bl gr">(.*?)</div', name.text)
-        #else:
-        #    name = 'no data'
-        #lst2.extend([city + name + phone])
-        lst2.append((city, *phone))
-    except Exception as e:
-        print(e)
-        continue
 
-print(lst2)
+def local():
+    lst1 = []
+    lst2 = []
+    flag = True
+    i = 1
+    while flag is True:
+        try:
+            s = get_html(base_url + '&page=' + str(i))
+            print(s)
+            lst1.extend(re.findall(r'advert-(.*?)"', s))
+            i += 1
+            if s.find('advert-') == -1:
+                flag = False
+        except Exception as e:
+            print(e)
+            i += 1
+            continue
+    lst1 = sorted(list(set(lst1)))
+
+    for i in lst1:
+        try:
+            city = get_html('https://m.kolesa.kz/a/show/' + i)
+            city = city[city.find('Город', 0) + 5:city.find('Кузов', 0)]
+            city = re.findall(r'<div>(.*?)</div>', city)[0]
+
+            phone = get_html('https://kolesa.kz/a/ajaxPhones/?id=' + i)
+            phone = phone.json()['data']['model']['phone']
+            phone = phone.replace(' ', '')
+            phone = phone.replace('+7', '')
+            phone = phone.split(',')
+            # phone = re.findall(r'"\+(.*?)[\\|\"|<]', phone.text.replace('+', ''))
+            # name = r.get('https://m.kolesa.kz/a/comments/' + i, headers=hdr)
+            # if 'lft-bl gr' in name.text:
+            #    name = re.findall(r'bl gr">(.*?)</div', name.text)[0]
+            # else:
+            #    name = 'no data'
+            # lst2.extend([city + name + phone])
+            lst2.append((city, *phone))
+        except Exception as e:
+            print(e)
+            continue
+
+    print(lst2)
+
+
+def main():
+    print(page_count(get_html(base_url)))
+
+
+if __name__ == '__main__':
+    main()
