@@ -26,15 +26,30 @@ def get_html(url):
 
 
 def page_count(html):
-    lst3 = []
     soup = BeautifulSoup(html, 'html.parser')
     last_page = soup.find('div', class_='holder-select')
     last_page = last_page.find_all('select')[0]
-    last_page = last_page.find_all('option')[-1]['value']
-    return last_page
+    last_page = last_page.find_all('option')[-1].get('value')
+    return int(last_page)
 
-    #return last_page.find_all('option').text
-    #return int(last_page.find_all('option')[-1].text)
+
+def links(html):
+    links = []
+    flag = True
+    i = 1
+    while flag is True:
+        try:
+            s = get_html(base_url + '&page=' + str(i))
+            print(s)
+            links.extend(re.findall(r'advert-(.*?)"', s))
+            i += 1
+            if s.find('advert-') == -1:
+                flag = False
+        except Exception as e:
+            print(e)
+            i += 1
+            continue
+    links = sorted(list(set(links)))
 
 
 def local():
