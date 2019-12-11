@@ -80,7 +80,7 @@ def querying():
                            WHERE total >= 10 AND
                            avgodd >= 1.7 AND
                            wrate >= 75 """)
-        #result = cursor.fetchall()
+        # result = cursor.fetchall()
         result = list(cursor)
         for x in result:
             html = html + get_html(predicts_url + str(x[0]))
@@ -88,10 +88,15 @@ def querying():
         trl = soup.find_all('tr', class_='bgr_light')
         trd = soup.find_all('tr', class_='bgr_dark')
         tr = trl + trd
-        for i in tr:
-            if i.find('-:-') == -1:
-                del i
-        print(tr)
+        lst = []
+        for x in tr:
+            if str(x).find('-:-') > 0:
+                lst.append(x)
+        td = []
+        for x in lst:
+            td.append(BeautifulSoup(str(x), 'html.parser').find_all('td'))
+        for x in range(2, len(td[0]) - 2):
+            print(td[0][x].text)
     except mysql.connector.Error as error:
         print("Error {}".format(error))
     finally:
@@ -101,7 +106,7 @@ def querying():
 
 
 def main():
-    #stats()
+    # stats()
     querying()
 
 
