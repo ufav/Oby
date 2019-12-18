@@ -4,12 +4,14 @@ import re
 from requests.adapters import HTTPAdapter, PoolManager
 from bs4 import BeautifulSoup
 import mysql.connector
+import datetime
 
 stats_url = 'https://vprognoze.ru/engine/modules/fc_statalluser.php?cid=201912&do=cmptopall&ajax=1&page='
-predicts_url = 'https://vprognoze.ru/?do=cmptopall&action=rating&cid=201912&uid='
+predicts_url = 'https://vprognoze.ru/?do=cmptopall&action=rating&cid=201912'
 hdr = {'X-Requested-With': 'XMLHttpRequest',
        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
                      'Chrome/78.0.3904.108 Safari/537.36'}
+currentdatetime = datetime.date.today()
 
 
 class MyAdapter(HTTPAdapter):
@@ -20,6 +22,18 @@ class MyAdapter(HTTPAdapter):
                                        ssl_version=ssl.PROTOCOL_TLSv1_2)
 
 
+def left(s, amount):
+    return s[:amount]
+
+
+def right(s, amount):
+    return s[-amount:]
+
+
+def mid(s, offset, amount):
+    return s[offset:offset + amount]
+
+
 def get_html(url):
     r = requests.Session()
     r.mount('https://', MyAdapter())
@@ -27,7 +41,7 @@ def get_html(url):
     return response.text
 
 
-def insert_stats(uid, username, total, avgodd, wrate):
+def insert_data(uid, username, total, avgodd, wrate):  # Добавление данных
     connection = mysql.connector.connect(host='localhost',
                                          database='vp',
                                          user='root',
@@ -47,24 +61,47 @@ def insert_stats(uid, username, total, avgodd, wrate):
             connection.close()
 
 
+def delete_last_data():  # Удаление последних данных
+    connection = mysql.connector.connect(host='localhost',
+                                         database='vp',
+                                         user='root',
+                                         password='Ghbrjk123')
+    cursor = connection.cursor()
+    try:
+        query = """ DELETE FROM stats
+                    WHERE STR_TO_DATE(DATE_FORMAT(created, '%Y-%m-%d'),'%Y-%m-%d') IN (
+                        SELECT max_date FROM (
+                            SELECT STR_TO_DATE(DATE_FORMAT(MAX(created), '%Y-%m-%d'),'%Y-%m-%d') AS max_date FROM stats
+                        ) AS max_stats
+                    ) """
+        cursor.execute(query)
+        connection.commit()
+    except mysql.connector.Error as error:
+        print("Failed to insert into MySQL table {}".format(error))
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+
 def stats():
+    delete_last_data()
     html = ''
     for i in range(5):
         html = html + get_html(stats_url + str(i))
-    soup = BeautifulSoup(html, 'html.parser')
-    a = soup.find_all('a')
+    a = BeautifulSoup(html, 'html.parser').find_all('a')
     for i in range(0, 1199, 12):
-        insert_stats(re.search(r'uid=(.*?)"', str(a[i + 7])).group(1),  # uid
-                     a[i + 1].text,  # username
-                     a[i + 3].text,  # total
-                     a[i + 7].text,  # avg odd
-                     str(round(int(a[i + 4].text) / int(a[i + 3].text) * 100)))  # %
+        insert_data(re.search(r'uid=(.*?)"', str(a[i + 7])).group(1),  # uid
+                    a[i + 1].text,  # username
+                    a[i + 3].text,  # total
+                    a[i + 7].text,  # avg odd
+                    str(round(int(a[i + 4].text) / int(a[i + 3].text) * 100)))  # %
     for i in range(1200, len(a), 13):
-        insert_stats(re.search(r'uid=(.*?)"', str(a[i + 8])).group(1),
-                     a[i + 1].text,
-                     a[i + 4].text,
-                     a[i + 8].text,
-                     str(round(int(a[i + 5].text) / int(a[i + 4].text) * 100)))
+        insert_data(re.search(r'uid=(.*?)"', str(a[i + 8])).group(1),
+                    a[i + 1].text,
+                    a[i + 4].text,
+                    a[i + 8].text,
+                    str(round(int(a[i + 5].text) / int(a[i + 4].text) * 100)))
 
 
 def querying():
@@ -83,20 +120,37 @@ def querying():
         # result = cursor.fetchall()
         result = list(cursor)
         for x in result:
-            html = html + get_html(predicts_url + str(x[0]))
+            html = html + get_html(predicts_url +
+                                   str(datetime.datetime.now().year) + str(datetime.datetime.now().month) +
+                                   '&uid=' + str(x[0]))
         soup = BeautifulSoup(html, 'html.parser')
         trl = soup.find_all('tr', class_='bgr_light')
         trd = soup.find_all('tr', class_='bgr_dark')
         tr = trl + trd
-        lst = []
+        lst1 = []
         for x in tr:
-            if str(x).find('-:-') > 0:
-                lst.append(x)
+            if (str(x).find('-:-') > 0) and \
+                    (str(x).find('Экспресс') == -1) and \
+                    (str(x).find('Борьба') == -1) and \
+                    (str(x).find('Шахматы') == -1) and \
+                    (str(x).find('боевые') == -1):
+                lst1.append(x)
         td = []
-        for x in lst:
+        for x in lst1:
             td.append(BeautifulSoup(str(x), 'html.parser').find_all('td'))
-        for x in range(2, len(td[0]) - 2):
-            print(td[0][x].text)
+        lst2 = []
+        for x in range(0, len(td) - 1):
+            lst3 = []
+            for y in range(2, len(td[x]) - 2):
+                lst3.append(td[x][y].text)
+            d = left(lst3[0], 2)
+            m = mid(lst3[0], 3, 2)
+            y = currentdatetime.year
+            t = lst3[0] = right(lst3[0], 5)
+            lst3[0] = str(y) + '-' + m + '-' + d + ' ' + t
+            lst2.append(lst3)
+        for i in lst2:
+            print(i)
     except mysql.connector.Error as error:
         print("Error {}".format(error))
     finally:
@@ -108,6 +162,12 @@ def querying():
 def main():
     # stats()
     querying()
+    # datetime_show()
+
+
+def datetime_show():
+    print(datetime.datetime.now().year)
+    print(datetime.datetime.now().month)
 
 
 if __name__ == "__main__":
