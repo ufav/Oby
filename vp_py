@@ -35,6 +35,16 @@ def mid(s, offset, amount):
     return s[offset:offset + amount]
 
 
+def str_count(str, substr):
+    count = 0
+    i = -1
+    while True:
+        i = str.find(substr, i+1)
+        if i == -1:
+            return count
+        count += 1
+
+
 def get_html(url):
     r = requests.Session()
     r.mount('https://', MyAdapter())
@@ -113,46 +123,57 @@ def querying():
                                          password='Ghbrjk123')
     cursor = connection.cursor()
     try:
-        cursor.execute(""" SELECT uid
-                           FROM stats
-                           WHERE total >= 10 AND
-                           avgodd >= 1.7 AND
-                           wrate >= 75 """)
-        # result = cursor.fetchall()
+        # cursor.execute(""" SELECT uid
+        #                    FROM stats
+        #                    WHERE total >= 10 AND
+        #                    avgodd >= 1.7 AND
+        #                    wrate >= 75 """)
+        # # result = cursor.fetchall()
+        # result = list(cursor)
+        # for x in result:
+        #     html = html + get_html(predicts_url +
+        #                            str(datetime.datetime.now().year) + str(datetime.datetime.now().month) +
+        #                            '&uid=' + str(x[0]))
+        # soup = BeautifulSoup(html, 'html.parser')
+        # trl = soup.find_all('tr', class_='bgr_light')
+        # trd = soup.find_all('tr', class_='bgr_dark')
+        # tr = trl + trd
+        # lst1 = []
+        # for x in tr:
+        #     if (str(x).find('-:-') > 0) and \
+        #             (str(x).find('Экспресс') == -1) and \
+        #             (str(x).find('Борьба') == -1) and \
+        #             (str(x).find('Шахматы') == -1) and \
+        #             (str(x).find('борств') == -1) and \
+        #             (str(x).find('боевые') == -1):
+        #         lst1.append(x)
+        # td = []
+        # for x in lst1:
+        #     td.append(BeautifulSoup(str(x), 'html.parser').find_all('td'))
+        # lst2 = []
+        # for x in range(0, len(td) - 1):
+        #     lst3 = []
+        #     for y in range(2, len(td[x]) - 2):
+        #         lst3.append(td[x][y].text)
+        #     d = left(lst3[0], 2)
+        #     m = mid(lst3[0], 3, 2)
+        #     y = currentdatetime.year
+        #     t = lst3[0] = right(lst3[0], 5)
+        #     lst3[0] = str(y) + '-' + m + '-' + d + ' ' + t
+        #     lst2.append(lst3)
+        # for i in lst2:
+        #     print(i)
+        lst1 = []
+        cursor.execute("""  SELECT username
+                            FROM stats """)
         result = list(cursor)
         for x in result:
-            html = html + get_html(predicts_url +
-                                   str(datetime.datetime.now().year) + str(datetime.datetime.now().month) +
-                                   '&uid=' + str(x[0]))
-        soup = BeautifulSoup(html, 'html.parser')
-        trl = soup.find_all('tr', class_='bgr_light')
-        trd = soup.find_all('tr', class_='bgr_dark')
-        tr = trl + trd
-        lst1 = []
-        for x in tr:
-            if (str(x).find('-:-') > 0) and \
-                    (str(x).find('Экспресс') == -1) and \
-                    (str(x).find('Борьба') == -1) and \
-                    (str(x).find('Шахматы') == -1) and \
-                    (str(x).find('борств') == -1) and \
-                    (str(x).find('боевые') == -1):
-                lst1.append(x)
-        td = []
-        for x in lst1:
-            td.append(BeautifulSoup(str(x), 'html.parser').find_all('td'))
-        lst2 = []
-        for x in range(0, len(td) - 1):
-            lst3 = []
-            for y in range(2, len(td[x]) - 2):
-                lst3.append(td[x][y].text)
-            d = left(lst3[0], 2)
-            m = mid(lst3[0], 3, 2)
-            y = currentdatetime.year
-            t = lst3[0] = right(lst3[0], 5)
-            lst3[0] = str(y) + '-' + m + '-' + d + ' ' + t
-            lst2.append(lst3)
-        for i in lst2:
-            print(i)
+            html = get_html('https://vprognoze.ru/user/' + str(x[0]))
+            soup = BeautifulSoup(html, 'html.parser')
+            div = str(soup.find('div', class_='user_info'))
+            if div.count('respluscell') >= 8:
+                lst1.append(x[0])
+                print(str(x[0]))
     except mysql.connector.Error as error:
         print("Error {}".format(error))
     finally:
@@ -163,9 +184,9 @@ def querying():
 
 def main():
     # stats()
-    # querying()
+    querying()
     # datetime_show()
-    print(quote('р’сЏс‡рµсЃр»р°рІ', encoding='cp1251'))
+    # print(quote('р’сЏс‡рµсЃр»р°рІ', encoding='cp1251'))
 
 
 def datetime_show():
