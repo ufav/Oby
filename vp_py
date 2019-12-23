@@ -5,9 +5,10 @@ from requests.adapters import HTTPAdapter, PoolManager
 from bs4 import BeautifulSoup
 import mysql.connector
 import datetime
+from urllib.parse import quote
 
 stats_url = 'https://vprognoze.ru/engine/modules/fc_statalluser.php?cid=201912&do=cmptopall&ajax=1&page='
-predicts_url = 'https://vprognoze.ru/?do=cmptopall&action=rating&cid=201912'
+predicts_url = 'https://vprognoze.ru/?do=cmptopall&action=rating&cid='
 hdr = {'X-Requested-With': 'XMLHttpRequest',
        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
                      'Chrome/78.0.3904.108 Safari/537.36'}
@@ -133,6 +134,7 @@ def querying():
                     (str(x).find('Экспресс') == -1) and \
                     (str(x).find('Борьба') == -1) and \
                     (str(x).find('Шахматы') == -1) and \
+                    (str(x).find('борств') == -1) and \
                     (str(x).find('боевые') == -1):
                 lst1.append(x)
         td = []
@@ -161,8 +163,9 @@ def querying():
 
 def main():
     # stats()
-    querying()
+    # querying()
     # datetime_show()
+    print(quote('р’сЏс‡рµсЃр»р°рІ', encoding='cp1251'))
 
 
 def datetime_show():
