@@ -1,0 +1,109 @@
+import ssl
+import requests
+import re
+from requests.adapters import HTTPAdapter, PoolManager
+from bs4 import BeautifulSoup
+import json
+
+url = "https://m.kolesa.kz/cars/body-coupe/volkswagen/golf/?auto-custom=2&auto-fuel=1&auto-car-transm=1&auto-sweel=1" \
+      "&year[from]=1992&year[to]=1992 "
+hdr = {'X-Requested-With': 'XMLHttpRequest',
+       'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                     'Chrome/78.0.3904.108 Safari/537.36'}
+
+
+class MyAdapter(HTTPAdapter):
+    def init_poolmanager(self, connections, maxsize, block=False):
+        self.poolmanager = PoolManager(num_pools=connections,
+                                       maxsize=maxsize,
+                                       block=block,
+                                       ssl_version=ssl.PROTOCOL_TLSv1_2)
+
+
+def get_html(url):
+    r = requests.Session()
+    r.mount('https://', MyAdapter())
+    response = r.get(url, headers=hdr)
+    return response.text
+
+
+def querying():
+    pass
+
+
+def page_count(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    last_page = soup.find('div', class_='holder-select')
+    last_page = last_page.find_all('select')[0]
+    last_page = last_page.find_all('option')[-1].get('value')
+    return int(last_page)
+
+
+def get_links(html):
+    links = []
+    flag = True
+    i = 1
+    while flag:
+        try:
+            s = get_html(url + '&page=' + str(i))
+            links.extend(re.findall(r'advert-(.*?)"', s))
+            i += 1
+            if s.find('advert-') == -1:
+                flag = False
+        except Exception as e:
+            print(e)
+            i += 1
+            continue
+    links = sorted(list(set(links)))
+    return links
+
+
+def parse():
+    links = []
+    parsed = []
+    flag = True
+    i = 1
+    while flag:
+        try:
+            s = get_html(url + '&page=' + str(i))
+            links.extend(re.findall(r'advert-(.*?)"', s))
+            i += 1
+            if s.find('advert-') == -1:
+                flag = False
+        except Exception as e:
+            print(e)
+            i += 1
+            continue
+    links = sorted(list(set(links)))
+    for i in links:
+        try:
+            city = get_html('https://m.kolesa.kz/a/show/' + i)
+            soup = str(BeautifulSoup(city, 'html.parser'))
+            city = soup[soup.find('Город', 0):soup.find('Кузов', 0)]
+            city = BeautifulSoup(city, 'html.parser').find('div', class_='a-properties__value').text.strip()
+
+            phones = []
+            phone = json.loads(get_html('https://kolesa.kz/a/ajaxPhones/?id=' + i).replace(' ', ''))
+            phones.extend(phone['phones'])
+            phone = phones
+
+            name = get_html('https://m.kolesa.kz/a/comments/' + i)
+            if 'lft-bl gr' in name:
+                soup = BeautifulSoup(name, 'html.parser')
+                name = soup.find('div', class_='lft-bl gr').text.split('для')[0].strip()
+            else:
+                name = '---'
+
+            parsed.append((city, name, phone))
+            print(parsed[-1])
+        except Exception as e:
+            print(e)
+            continue
+
+
+def main():
+    parse()
+
+
+if __name__ == "__main__":
+    main()
